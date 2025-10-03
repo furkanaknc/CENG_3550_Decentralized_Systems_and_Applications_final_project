@@ -1,35 +1,34 @@
 import { Request, Response } from 'express';
-import { Courier } from '../models';
-import { v4 as uuid } from 'uuid';
+import { getCouriers, updateCourier } from '../repositories/couriersRepository';
 
-const couriers: Courier[] = [
-  {
-    id: uuid(),
-    name: 'Eco Kurye 1',
-    active: true,
-    currentLocation: { latitude: 41.0082, longitude: 28.9784 }
+export async function listCouriers(_req: Request, res: Response) {
+  try {
+    const couriers = await getCouriers();
+    res.json({ couriers });
+  } catch (error) {
+    console.error('Failed to list couriers', error);
+    res.status(500).json({ message: 'Unable to list couriers' });
   }
-];
-
-export function listCouriers(_req: Request, res: Response) {
-  res.json({ couriers });
 }
 
-export function updateCourierLocation(req: Request, res: Response) {
+export async function updateCourierLocation(req: Request, res: Response) {
   const { id } = req.params;
   const { latitude, longitude, active } = req.body;
 
-  const courier = couriers.find((c) => c.id === id);
-  if (!courier) {
-    return res.status(404).json({ message: 'Courier not found' });
-  }
+  try {
+    const courier = await updateCourier(id, {
+      latitude: typeof latitude === 'number' ? latitude : undefined,
+      longitude: typeof longitude === 'number' ? longitude : undefined,
+      active: typeof active === 'boolean' ? active : undefined
+    });
 
-  if (typeof latitude === 'number' && typeof longitude === 'number') {
-    courier.currentLocation = { latitude, longitude };
-  }
-  if (typeof active === 'boolean') {
-    courier.active = active;
-  }
+    if (!courier) {
+      return res.status(404).json({ message: 'Courier not found' });
+    }
 
-  res.json({ courier });
+    res.json({ courier });
+  } catch (error) {
+    console.error('Failed to update courier', error);
+    res.status(500).json({ message: 'Unable to update courier' });
+  }
 }

@@ -19,6 +19,22 @@ npm test
 npm run dev
 ```
 
+Backend veri tabanı için Docker Compose kullanabilirsiniz:
+```bash
+cd backend
+cp .env.example .env
+docker compose up -d postgres
+npm run migrate
+```
+Bu komut PostgreSQL 16 konteynerini başlatır ve varsayılan kimlik bilgilerini `.env` dosyanızdan alır.
+`npm run migrate` komutu ise `db/migrations` dizinindeki SQL betiklerini çalıştırarak aşağıdaki tabloları oluşturur:
+
+- `users`: Talep sahiplerini ve biriken `green_points` değerlerini saklar.
+- `couriers`: Kurye durumları ile en son bilinen koordinatlarını tutar.
+- `recycling_locations`: OSM tabanlı geri dönüşüm noktalarını önbelleğe alır.
+- `pickups`: Kurye atama akışındaki toplama isteklerini kayıt altına alır.
+- `carbon_reports`: Tamamlanan toplama için hesaplanan karbon tasarrufunu saklar.
+
 ### Akıllı Sözleşmeler
 ```bash
 cd blockchain
