@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import pickupRouter from './routes/pickups';
 import courierRouter from './routes/couriers';
 import analyticsRouter from './routes/analytics';
+import mapRouter from './routes/maps';
 
 dotenv.config();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 app.use('/api/pickups', pickupRouter);
 app.use('/api/couriers', courierRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/maps', mapRouter);
 
 const port = process.env.PORT || 4000;
 
