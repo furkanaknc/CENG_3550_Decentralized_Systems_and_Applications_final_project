@@ -4,8 +4,16 @@ class RecyclingPoint {
   final String id;
   final String name;
   final List<String> acceptedMaterials;
+  final double latitude;
+  final double longitude;
 
-  RecyclingPoint({required this.id, required this.name, required this.acceptedMaterials});
+  RecyclingPoint({
+    required this.id,
+    required this.name,
+    required this.acceptedMaterials,
+    required this.latitude,
+    required this.longitude,
+  });
 }
 
 class RewardSummary {
@@ -30,11 +38,15 @@ class ApiService {
         id: 'loc-1',
         name: 'Kadıköy Belediyesi Geri Dönüşüm Merkezi',
         acceptedMaterials: const ['plastik', 'cam', 'metal'],
+        latitude: 40.9900,
+        longitude: 29.0270,
       ),
       RecyclingPoint(
         id: 'loc-2',
         name: 'Üsküdar Yeşil Nokta',
         acceptedMaterials: const ['kağıt', 'elektronik'],
+        latitude: 41.0221,
+        longitude: 29.0150,
       ),
     ];
   }
