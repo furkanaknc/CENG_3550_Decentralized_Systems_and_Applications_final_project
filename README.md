@@ -19,6 +19,14 @@ npm test
 npm run dev
 ```
 
+Backend veri tabanı için Docker Compose kullanabilirsiniz:
+```bash
+cd backend
+cp .env.example .env
+docker compose up -d postgres
+```
+Bu komut PostgreSQL 16 konteynerini başlatır ve varsayılan kimlik bilgilerini `.env` dosyanızdan alır.
+
 ### Akıllı Sözleşmeler
 ```bash
 cd blockchain
