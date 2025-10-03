@@ -38,13 +38,10 @@ export type SearchOptions = {
 class OpenStreetMapClient {
   private readonly baseUrl: string;
   private readonly userAgent: string;
-  private readonly contactEmail?: string;
 
   constructor() {
     this.baseUrl = process.env.OPENSTREETMAP_BASE_URL ?? 'https://nominatim.openstreetmap.org';
-    this.userAgent =
-      process.env.OPENSTREETMAP_USER_AGENT ?? 'recycle-backend/1.0 (+https://example.com/contact)';
-    this.contactEmail = process.env.OPENSTREETMAP_EMAIL;
+    this.userAgent = 'recycle-backend/1.0 (+https://example.com/contact)';
   }
 
   public async search(query: string, options: SearchOptions = {}): Promise<OpenStreetMapSearchResult[]> {
@@ -100,16 +97,10 @@ class OpenStreetMapClient {
   }
 
   private buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
+    return {
       'User-Agent': this.userAgent,
       Accept: 'application/json'
     };
-
-    if (this.contactEmail) {
-      headers['From'] = this.contactEmail;
-    }
-
-    return headers;
   }
 }
 
