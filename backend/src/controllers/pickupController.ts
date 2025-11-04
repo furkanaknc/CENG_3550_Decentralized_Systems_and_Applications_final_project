@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import mapService from '../services/maps';
-import { calculateGreenPoints, estimateCarbonSavings } from '../services/analytics';
+import {
+  calculateGreenPoints,
+  estimateCarbonSavings
+} from '../services/analytics';
 import { v4 as uuid } from 'uuid';
 import {
   assignCourierToPickup,
@@ -10,7 +13,10 @@ import {
   listPickups as listPickupRecords,
   saveCarbonReport
 } from '../repositories/pickupsRepository';
-import { ensureUserExists, addGreenPoints } from '../repositories/usersRepository';
+import {
+  ensureUserExists,
+  addGreenPoints
+} from '../repositories/usersRepository';
 import { getCouriers } from '../repositories/couriersRepository';
 
 export async function createPickup(req: Request, res: Response) {
@@ -18,6 +24,13 @@ export async function createPickup(req: Request, res: Response) {
 
   if (!userId || !material || !weightKg || !pickupLocation) {
     return res.status(400).json({ message: 'Missing pickup fields' });
+  }
+
+  // pickupLocation.coordinates yapısından coordinates'i çıkar
+  const coordinates = pickupLocation.coordinates || pickupLocation;
+
+  if (!coordinates.latitude || !coordinates.longitude) {
+    return res.status(400).json({ message: 'Missing pickup coordinates' });
   }
 
   try {
@@ -28,9 +41,9 @@ export async function createPickup(req: Request, res: Response) {
       userId,
       material,
       weightKg,
-      pickupLocation
+      pickupLocation: coordinates
     });
-    const locations = await mapService.findNearbyLocations(pickupLocation);
+    const locations = await mapService.findNearbyLocations(coordinates);
 
     return res.status(201).json({ pickup, nearbyLocations: locations });
   } catch (error) {
@@ -49,9 +62,14 @@ export async function assignCourier(req: Request, res: Response) {
 
   if (
     dropoffLocation &&
-    (!dropoffLocation.id || !dropoffLocation.coordinates || dropoffLocation.coordinates.latitude === undefined || dropoffLocation.coordinates.longitude === undefined)
+    (!dropoffLocation.id ||
+      !dropoffLocation.coordinates ||
+      dropoffLocation.coordinates.latitude === undefined ||
+      dropoffLocation.coordinates.longitude === undefined)
   ) {
-    return res.status(400).json({ message: 'dropoffLocation requires id and coordinates' });
+    return res
+      .status(400)
+      .json({ message: 'dropoffLocation requires id and coordinates' });
   }
 
   try {
@@ -66,10 +84,17 @@ export async function assignCourier(req: Request, res: Response) {
       return res.status(404).json({ message: 'Courier not found' });
     }
 
-    const updatedPickup = await assignCourierToPickup(id, courierId, dropoffLocation);
+    const updatedPickup = await assignCourierToPickup(
+      id,
+      courierId,
+      dropoffLocation
+    );
 
     const route = dropoffLocation
-      ? await mapService.calculateRoute(updatedPickup.pickupLocation, dropoffLocation.coordinates)
+      ? await mapService.calculateRoute(
+          updatedPickup.pickupLocation,
+          dropoffLocation.coordinates
+        )
       : undefined;
 
     res.json({ pickup: updatedPickup, route });
