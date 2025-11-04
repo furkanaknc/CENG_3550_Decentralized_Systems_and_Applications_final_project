@@ -20,6 +20,42 @@ class RecyclingPoint {
   }) : acceptedMaterials = List.unmodifiable(acceptedMaterials);
 }
 
+class PickupSummary {
+  PickupSummary({
+    required this.id,
+    required this.material,
+    required this.weightKg,
+    required this.status,
+    required this.latitude,
+    required this.longitude,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String material;
+  final double weightKg;
+  final String status;
+  final double latitude;
+  final double longitude;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+}
+
+class PickupRequestResult {
+  PickupRequestResult({
+    required this.pickup,
+    required List<RecyclingPoint> nearbyLocations,
+  }) : nearbyLocations = List.unmodifiable(nearbyLocations);
+
+  final PickupSummary pickup;
+  final List<RecyclingPoint> nearbyLocations;
+
+  String get confirmationMessage =>
+      'Talebiniz alındı (#${pickup.id}). '
+      '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material} kaydedildi.';
+}
+
 class RewardSummary {
   final int points;
   final double carbonSavings;
@@ -133,26 +169,7 @@ class ApiService {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final locations = payload['locations'] as List<dynamic>? ?? <dynamic>[];
-
-    final points = locations.map((dynamic item) {
-      final map = item as Map<String, dynamic>;
-      final coordinates = map['coordinates'] as Map<String, dynamic>? ?? <String, dynamic>{};
-      final acceptedMaterials =
-          (map['acceptedMaterials'] as List<dynamic>? ?? const <dynamic>[])
-              .map((dynamic material) => material.toString())
-              .where((material) => material.isNotEmpty)
-              .toList();
-
-      return RecyclingPoint(
-        id: map['id']?.toString() ?? '',
-        name: map['name']?.toString() ?? 'Geri dönüşüm noktası',
-        acceptedMaterials:
-            acceptedMaterials.isNotEmpty ? acceptedMaterials : _defaultAcceptedMaterials,
-        latitude: (coordinates['latitude'] as num?)?.toDouble() ?? _defaultLatitude,
-        longitude: (coordinates['longitude'] as num?)?.toDouble() ?? _defaultLongitude,
-      );
-    }).toList();
+    final points = _mapRecyclingPoints(payload['locations'] as List<dynamic>?);
 
     if (points.isNotEmpty) {
       return points;
@@ -171,7 +188,7 @@ class ApiService {
         .toList(growable: false);
   }
 
-  Future<String> requestPickup({
+  Future<PickupRequestResult> requestPickup({
     required String material,
     required double weightKg,
     double? latitude,
@@ -199,12 +216,27 @@ class ApiService {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final pickup = payload['pickup'] as Map<String, dynamic>? ?? <String, dynamic>{};
-    final id = pickup['id']?.toString() ?? 'bilinmiyor';
-    final savedWeight = (pickup['weightKg'] as num?)?.toDouble() ?? weightKg;
-    final savedMaterial = pickup['material']?.toString() ?? material;
+    final pickup =
+        payload['pickup'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final pickupLocation =
+        pickup['pickupLocation'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final suggestions =
+        _mapRecyclingPoints(payload['nearbyLocations'] as List<dynamic>?);
 
-    return 'Talebiniz alındı (#$id). ${savedWeight.toStringAsFixed(1)} kg $savedMaterial kaydedildi.';
+    final summary = PickupSummary(
+      id: pickup['id']?.toString() ?? 'bilinmiyor',
+      material: pickup['material']?.toString() ?? material,
+      weightKg: (pickup['weightKg'] as num?)?.toDouble() ?? weightKg,
+      status: pickup['status']?.toString() ?? 'pending',
+      latitude: (pickupLocation['latitude'] as num?)?.toDouble() ??
+          latitude ?? _defaultLatitude,
+      longitude: (pickupLocation['longitude'] as num?)?.toDouble() ??
+          longitude ?? _defaultLongitude,
+      createdAt: _parseDateTime(pickup['createdAt']),
+      updatedAt: _parseDateTime(pickup['updatedAt']),
+    );
+
+    return PickupRequestResult(pickup: summary, nearbyLocations: suggestions);
   }
 
   Future<RewardSummary> fetchRewardSummary() async {
@@ -219,5 +251,52 @@ class ApiService {
     final totalCarbon = (payload['totalCarbon'] as num?)?.toDouble() ?? 0.0;
 
     return RewardSummary(points: totalPoints, carbonSavings: totalCarbon);
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  List<RecyclingPoint> _mapRecyclingPoints(List<dynamic>? rawLocations) {
+    if (rawLocations == null) {
+      return const [];
+    }
+
+    return rawLocations
+        .map(_parseRecyclingPoint)
+        .whereType<RecyclingPoint>()
+        .toList(growable: false);
+  }
+
+  RecyclingPoint? _parseRecyclingPoint(dynamic raw) {
+    final location = raw as Map<String, dynamic>?;
+    if (location == null) {
+      return null;
+    }
+
+    final coordinates =
+        location['coordinates'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final acceptedMaterials =
+        (location['acceptedMaterials'] as List<dynamic>? ?? const <dynamic>[])
+            .map((dynamic material) => material.toString())
+            .where((material) => material.isNotEmpty)
+            .toList();
+
+    final latitude = (coordinates['latitude'] as num?)?.toDouble() ?? _defaultLatitude;
+    final longitude = (coordinates['longitude'] as num?)?.toDouble() ?? _defaultLongitude;
+
+    return RecyclingPoint(
+      id: location['id']?.toString() ??
+          'point-${latitude.toStringAsFixed(4)}-${longitude.toStringAsFixed(4)}',
+      name: location['name']?.toString() ?? 'Geri dönüşüm noktası',
+      acceptedMaterials: acceptedMaterials.isNotEmpty
+          ? acceptedMaterials
+          : _defaultAcceptedMaterials,
+      latitude: latitude,
+      longitude: longitude,
+    );
   }
 }
