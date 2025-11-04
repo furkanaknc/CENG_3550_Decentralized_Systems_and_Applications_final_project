@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -20,6 +21,7 @@ class _MapScreenState extends State<MapScreen> {
   static const double _minZoom = 3;
   static const double _maxZoom = 18;
   static const double _zoomStep = 1.2;
+  bool _showWebHint = kIsWeb;
 
   @override
   void initState() {
@@ -84,13 +86,19 @@ class _MapScreenState extends State<MapScreen> {
     final camera = _mapController.camera;
     final zoom = camera.zoom.isFinite ? camera.zoom : 14;
     _mapController.move(target, zoom.clamp(10, _maxZoom).toDouble());
-    setState(() => _selectedPoint = point);
+    setState(() {
+      _selectedPoint = point;
+      _showWebHint = false;
+    });
   }
 
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
     final targetZoom = (camera.zoom + delta).clamp(_minZoom, _maxZoom).toDouble();
     _mapController.move(camera.center, targetZoom);
+    if (_showWebHint) {
+      setState(() => _showWebHint = false);
+    }
   }
 
   void _zoomIn() => _zoomBy(_zoomStep);
@@ -132,7 +140,10 @@ class _MapScreenState extends State<MapScreen> {
             alignment: Alignment.topCenter,
             child: GestureDetector(
               onTap: () {
-                setState(() => _selectedPoint = point);
+                setState(() {
+                  _selectedPoint = point;
+                  _showWebHint = false;
+                });
               },
               child: Icon(
                 Icons.location_on,
@@ -162,7 +173,12 @@ class _MapScreenState extends State<MapScreen> {
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
             ),
-            onTap: (_, __) => setState(() => _selectedPoint = null),
+            onTap: (_, __) {
+              setState(() {
+                _selectedPoint = null;
+                _showWebHint = false;
+              });
+            },
           ),
           children: [
             TileLayer(
@@ -208,6 +224,15 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+        if (_showWebHint)
+          Positioned(
+            left: 16,
+            top: 16,
+            right: 16,
+            child: SafeArea(
+              child: _WebHelpCard(onClose: () => setState(() => _showWebHint = false)),
             ),
           ),
         Positioned(
@@ -286,6 +311,44 @@ class _MapScreenState extends State<MapScreen> {
                   style: textTheme.bodySmall,
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WebHelpCard extends StatelessWidget {
+  const _WebHelpCard({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(16),
+      color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Chrome üzerinde haritayı incelemek için fare ile sürükleyebilir, '
+                'yakınlaştırma butonlarını kullanabilir veya Ctrl tuşuna basıp '
+                'mouse tekerleğini çevirebilirsin.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Kapat',
+              onPressed: onClose,
+              icon: const Icon(Icons.close),
             ),
           ],
         ),
