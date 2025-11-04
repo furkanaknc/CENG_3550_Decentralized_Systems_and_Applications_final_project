@@ -52,6 +52,16 @@ flutter test
 flutter run
 ```
 
+Depoda, CI veya konteyner ortamlarında Flutter kurulumunu otomatikleştirmek için bir yardımcı betik de
+sunuyoruz. Bu betik varsayılan olarak Flutter 3.22.1 sürümünü indirir ve `mobile/` testlerini çalıştırır:
+
+```bash
+./scripts/flutter_test.sh
+```
+
+`FLUTTER_VERSION`, `FLUTTER_CHANNEL` veya `FLUTTER_HOME` değişkenleri ile farklı sürüm ya da kurulum yolu
+seçebilirsiniz.
+
 ## Yol Haritası
 - Gerçek Google Maps ve kurye API entegrasyonlarının tamamlanması.
 - PostgreSQL bağlantısının yapılandırılması ve veri analiz raporlarının zenginleştirilmesi.

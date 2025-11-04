@@ -12,6 +12,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
   int _points = 0;
   double _carbon = 0;
   bool _loading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -20,18 +21,69 @@ class _RewardsScreenState extends State<RewardsScreen> {
   }
 
   Future<void> _loadRewards() async {
-    final summary = await ApiService().fetchRewardSummary();
-    setState(() {
-      _points = summary.points;
-      _carbon = summary.carbonSavings;
-      _loading = false;
-    });
+    try {
+      final summary = await ApiService().fetchRewardSummary();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _points = summary.points;
+        _carbon = summary.carbonSavings;
+        _loading = false;
+        _errorMessage = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = error.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Ödül bilgileri alınamadı. Lütfen tekrar deneyiniz.';
+        _loading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                setState(() {
+                  _loading = true;
+                  _errorMessage = null;
+                });
+                _loadRewards();
+              },
+              child: const Text('Tekrar dene'),
+            )
+          ],
+        ),
+      );
     }
 
     return Padding(

@@ -13,6 +13,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
   final _weightController = TextEditingController();
   String _material = 'plastic';
   String? _statusMessage;
+  bool _statusIsError = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -23,14 +25,50 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final result = await ApiService().requestPickup(
-      material: _material,
-      weightKg: double.parse(_weightController.text),
-    );
-
     setState(() {
-      _statusMessage = result;
+      _statusMessage = null;
+      _statusIsError = false;
+      _submitting = true;
     });
+
+    try {
+      final result = await ApiService().requestPickup(
+        material: _material,
+        weightKg: double.parse(_weightController.text),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _statusMessage = result;
+        _statusIsError = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = error.message;
+        _statusIsError = true;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _statusMessage = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
+        _statusIsError = true;
+      });
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitting = false;
+      });
+    }
   }
 
   @override
@@ -70,10 +108,26 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
               },
             ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _submit, child: const Text('Kurye Talep Et')),
+            ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Kurye Talep Et'),
+            ),
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),
-              Text(_statusMessage!, style: Theme.of(context).textTheme.bodyMedium)
+              Text(
+                _statusMessage!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _statusIsError
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+              )
             ]
           ],
         ),

@@ -16,6 +16,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _loading = true;
   List<RecyclingPoint> _points = const [];
   RecyclingPoint? _selectedPoint;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -24,15 +25,41 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _loadPoints() async {
-    final points = await ApiService().fetchRecyclingPoints();
-    setState(() {
-      _points = points;
-      _loading = false;
-    });
+    try {
+      final points = await ApiService().fetchRecyclingPoints();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _points = points;
+        _loading = false;
+        _errorMessage = null;
+      });
 
-    if (points.isNotEmpty) {
-      Future.microtask(() => _fitCameraToPoints(points));
+      if (points.isNotEmpty) {
+        Future.microtask(() {
+          if (mounted) {
+            _fitCameraToPoints(points);
+          }
+        });
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Geri dönüşüm noktaları yüklenemedi. Lütfen tekrar deneyin.';
+        _loading = false;
+      });
     }
+  }
+
+  Future<void> _retry() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+    await _loadPoints();
   }
 
   void _fitCameraToPoints(List<RecyclingPoint> points) {
@@ -53,6 +80,26 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _retry, child: const Text('Tekrar dene')),
+          ],
+        ),
+      );
     }
 
     final markers = _points

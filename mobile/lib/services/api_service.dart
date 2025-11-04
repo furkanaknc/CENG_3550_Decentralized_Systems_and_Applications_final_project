@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 
 class RecyclingPoint {
   final String id;
@@ -23,41 +26,140 @@ class RewardSummary {
   RewardSummary({required this.points, required this.carbonSavings});
 }
 
-/// Simplified API client that mocks backend interactions until networking is wired up.
+class ApiException implements Exception {
+  ApiException(this.message, [this.statusCode]);
+
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() {
+    final code = statusCode != null ? ' (status: $statusCode)' : '';
+    return 'ApiException$code: $message';
+  }
+}
+
+/// API istemcisi backend ile haberleşmeyi üstlenir.
 class ApiService {
-  static final ApiService _singleton = ApiService._();
+  ApiService._internal();
+
+  static final ApiService _singleton = ApiService._internal();
 
   factory ApiService() => _singleton;
 
-  ApiService._();
+  static const double _defaultLatitude = 41.0082;
+  static const double _defaultLongitude = 28.9784;
+  static const String _defaultBaseUrl =
+      String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:4000');
 
-  Future<List<RecyclingPoint>> fetchRecyclingPoints() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return [
-      RecyclingPoint(
-        id: 'loc-1',
-        name: 'Kadıköy Belediyesi Geri Dönüşüm Merkezi',
-        acceptedMaterials: const ['plastik', 'cam', 'metal'],
-        latitude: 40.9900,
-        longitude: 29.0270,
-      ),
-      RecyclingPoint(
-        id: 'loc-2',
-        name: 'Üsküdar Yeşil Nokta',
-        acceptedMaterials: const ['kağıt', 'elektronik'],
-        latitude: 41.0221,
-        longitude: 29.0150,
-      ),
-    ];
+  final http.Client _client = http.Client();
+  String _baseUrl = _sanitizeBaseUrl(_defaultBaseUrl);
+
+  /// Manuel olarak backend adresini değiştirmek isteyenler için yardımcı metot.
+  void configure({String? baseUrl}) {
+    if (baseUrl == null || baseUrl.isEmpty) {
+      return;
+    }
+    _baseUrl = _sanitizeBaseUrl(baseUrl);
   }
 
-  Future<String> requestPickup({required String material, required double weightKg}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return 'Talebiniz alındı. $material için ${weightKg.toStringAsFixed(1)} kg geri dönüşüm kaydedildi.';
+  static String _sanitizeBaseUrl(String value) {
+    return value.replaceAll(RegExp(r'/+$'), '');
+  }
+
+  Uri _uri(String path, [Map<String, String>? queryParameters]) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$_baseUrl$normalizedPath').replace(queryParameters: queryParameters);
+  }
+
+  Future<List<RecyclingPoint>> fetchRecyclingPoints({
+    double? latitude,
+    double? longitude,
+    double radiusKm = 5,
+  }) async {
+    final lat = latitude ?? _defaultLatitude;
+    final lon = longitude ?? _defaultLongitude;
+
+    final response = await _client.get(
+      _uri('/api/maps/nearby', {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+        'radiusKm': radiusKm.toString(),
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Geri dönüşüm merkezleri alınamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final locations = payload['locations'] as List<dynamic>? ?? <dynamic>[];
+
+    return locations.map((dynamic item) {
+      final map = item as Map<String, dynamic>;
+      final coordinates = map['coordinates'] as Map<String, dynamic>? ?? <String, dynamic>{};
+      final acceptedMaterials =
+          (map['acceptedMaterials'] as List<dynamic>? ?? const <dynamic>[])
+              .map((dynamic material) => material.toString())
+              .toList();
+
+      return RecyclingPoint(
+        id: map['id']?.toString() ?? '',
+        name: map['name']?.toString() ?? 'Geri dönüşüm noktası',
+        acceptedMaterials: acceptedMaterials,
+        latitude: (coordinates['latitude'] as num?)?.toDouble() ?? _defaultLatitude,
+        longitude: (coordinates['longitude'] as num?)?.toDouble() ?? _defaultLongitude,
+      );
+    }).toList();
+  }
+
+  Future<String> requestPickup({
+    required String material,
+    required double weightKg,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final response = await _client.post(
+      _uri('/api/pickups'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'userId': 'demo-user',
+        'material': material,
+        'weightKg': weightKg,
+        'pickupLocation': {
+          'id': 'user-location',
+          'coordinates': {
+            'latitude': latitude ?? _defaultLatitude,
+            'longitude': longitude ?? _defaultLongitude,
+          },
+        }
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw ApiException('Kurye talebi oluşturulamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pickup = payload['pickup'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final id = pickup['id']?.toString() ?? 'bilinmiyor';
+    final savedWeight = (pickup['weightKg'] as num?)?.toDouble() ?? weightKg;
+    final savedMaterial = pickup['material']?.toString() ?? material;
+
+    return 'Talebiniz alındı (#$id). ${savedWeight.toStringAsFixed(1)} kg $savedMaterial kaydedildi.';
   }
 
   Future<RewardSummary> fetchRewardSummary() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return RewardSummary(points: 120, carbonSavings: 4.3);
+    final response = await _client.get(_uri('/api/analytics'));
+
+    if (response.statusCode != 200) {
+      throw ApiException('Ödül bilgileri alınamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final totalPoints = (payload['totalPoints'] as num?)?.round() ?? 0;
+    final totalCarbon = (payload['totalCarbon'] as num?)?.toDouble() ?? 0.0;
+
+    return RewardSummary(points: totalPoints, carbonSavings: totalCarbon);
   }
 }
