@@ -5,6 +5,7 @@ description: Mobile client for courier-assisted recycling pickups and rewards
 environment:
   sdk: '>=3.3.0 <4.0.0'
 dependencies:
+  flutter_dotenv: ^5.1.0
   flutter:
     sdk: flutter
   http: ^1.2.1
@@ -16,3 +17,5 @@ dev_dependencies:
   flutter_lints: ^3.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - .env

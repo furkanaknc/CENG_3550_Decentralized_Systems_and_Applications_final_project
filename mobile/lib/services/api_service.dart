@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class RecyclingPoint {
@@ -41,7 +42,11 @@ class ApiException implements Exception {
 
 /// API istemcisi backend ile haberleşmeyi üstlenir.
 class ApiService {
-  ApiService._internal();
+  ApiService._internal() {
+    _baseUrl = _sanitizeBaseUrl(
+      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:4000'
+    );
+  }
 
   static final ApiService _singleton = ApiService._internal();
 
@@ -49,11 +54,9 @@ class ApiService {
 
   static const double _defaultLatitude = 41.0082;
   static const double _defaultLongitude = 28.9784;
-  static const String _defaultBaseUrl =
-      String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:4000');
 
   final http.Client _client = http.Client();
-  String _baseUrl = _sanitizeBaseUrl(_defaultBaseUrl);
+  late String _baseUrl;
 
   /// Manuel olarak backend adresini değiştirmek isteyenler için yardımcı metot.
   void configure({String? baseUrl}) {
