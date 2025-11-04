@@ -1,10 +1,14 @@
 import { Router } from 'express';
-import { getNearbyRecyclingCenters, reverseGeocode, searchAddress } from '../controllers/mapController';
+import {
+  getNearbyRecyclingCenters,
+  reverseGeocode,
+  searchAddress
+} from '../controllers/mapController';
 
 const router = Router();
 
 router.get('/search', searchAddress);
 router.get('/reverse', reverseGeocode);
-router.get('/recycling-centers', getNearbyRecyclingCenters);
+router.get('/nearby', getNearbyRecyclingCenters);
 
 export default router;
