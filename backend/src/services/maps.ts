@@ -1,5 +1,6 @@
 import { Coordinates, RecyclingLocation } from '../models';
 import openStreetMapClient, { OpenStreetMapSearchResult } from './openStreetMap';
+import { findNearbyLocations as findNearbyLocationsFromDb } from '../repositories/recyclingLocationsRepository';
 
 type Route = {
   distanceKm: number;
@@ -17,6 +18,14 @@ const DEFAULT_ACCEPTED_MATERIALS: RecyclingLocation['acceptedMaterials'] = [
 export class MapService {
   public async findNearbyLocations(origin: Coordinates, radiusKm = 5): Promise<RecyclingLocation[]> {
     try {
+      // Önce database'den çek
+      const dbLocations = await findNearbyLocationsFromDb(origin.latitude, origin.longitude, radiusKm);
+      
+      if (dbLocations.length > 0) {
+        return dbLocations;
+      }
+
+      // Database'de bulunamazsa OpenStreetMap'ten çek (fallback)
       const viewbox = this.buildViewbox(origin, radiusKm);
       const results = await openStreetMapClient.search('recycling centre', {
         viewbox,
@@ -26,7 +35,7 @@ export class MapService {
 
       return results.map((result) => this.toRecyclingLocation(result));
     } catch (error) {
-      console.error('Failed to fetch nearby recycling locations from OpenStreetMap', error);
+      console.error('Failed to fetch nearby recycling locations', error);
       return [];
     }
   }
