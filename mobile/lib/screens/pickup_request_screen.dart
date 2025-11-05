@@ -131,104 +131,112 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Kurye talep et', style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              'Geri dönüşüm atıklarını kapınızdan aldırmak için konumunuzu işaretleyin ve talep detaylarını paylaşın.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            _buildMapSection(context),
-            const SizedBox(height: 24),
-            Text('Toplama detayları', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Material(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _material,
-                      decoration: const InputDecoration(labelText: 'Atık türü'),
-                      items: const [
-                        DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
-                        DropdownMenuItem(value: 'glass', child: Text('Cam')),
-                        DropdownMenuItem(value: 'paper', child: Text('Kağıt')),
-                        DropdownMenuItem(value: 'metal', child: Text('Metal')),
-                        DropdownMenuItem(value: 'electronics', child: Text('Elektronik')),
-                      ],
-                      onChanged: (value) => setState(() => _material = value ?? 'plastic'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _weightController,
-                      decoration: const InputDecoration(labelText: 'Ağırlık (kg)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Lütfen ağırlık giriniz';
-                        }
-                        final parsed = double.tryParse(value.replaceAll(',', '.'));
-                        if (parsed == null || parsed <= 0) {
-                          return 'Geçerli bir değer giriniz';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _submitting ? null : _submit,
-                      icon: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.delivery_dining),
-                      label: Text(_submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_statusMessage != null) ...[
-              const SizedBox(height: 12),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Kapat',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const Text('Kurye talep et'),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _statusMessage!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _statusIsError
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary,
-                ),
+                'Geri dönüşüm atıklarını kapınızdan aldırmak için konumunuzu işaretleyin ve talep detaylarını paylaşın.',
+                style: theme.textTheme.bodyMedium,
               ),
-            ],
-            if (_result != null) ...[
               const SizedBox(height: 20),
-              _PickupSummaryCard(
-                result: _result!,
-                statusLabel: _statusLabel(_result!.pickup.status),
-                createdAtLabel: _formatDate(_result!.pickup.createdAt),
-                onStartNew: _startNewRequest,
-              ),
-              if (_result!.nearbyLocations.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Yakınınızdaki geri dönüşüm noktaları',
-                  style: theme.textTheme.titleMedium,
+              _buildMapSection(context),
+              const SizedBox(height: 24),
+              Text('Toplama detayları', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Material(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: _material,
+                        decoration: const InputDecoration(labelText: 'Atık türü'),
+                        items: const [
+                          DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
+                          DropdownMenuItem(value: 'glass', child: Text('Cam')),
+                          DropdownMenuItem(value: 'paper', child: Text('Kağıt')),
+                          DropdownMenuItem(value: 'metal', child: Text('Metal')),
+                          DropdownMenuItem(value: 'electronics', child: Text('Elektronik')),
+                        ],
+                        onChanged: (value) => setState(() => _material = value ?? 'plastic'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _weightController,
+                        decoration: const InputDecoration(labelText: 'Ağırlık (kg)'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Lütfen ağırlık giriniz';
+                          }
+                          final parsed = double.tryParse(value.replaceAll(',', '.'));
+                          if (parsed == null || parsed <= 0) {
+                            return 'Geçerli bir değer giriniz';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _submitting ? null : _submit,
+                        icon: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.delivery_dining),
+                        label: Text(_submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                ..._buildNearbySuggestionCards(_result!.nearbyLocations),
+              ),
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _statusMessage!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: _statusIsError
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
+                  ),
+                ),
               ],
+              if (_result != null) ...[
+                const SizedBox(height: 20),
+                _PickupSummaryCard(
+                  result: _result!,
+                  statusLabel: _statusLabel(_result!.pickup.status),
+                  createdAtLabel: _formatDate(_result!.pickup.createdAt),
+                  onStartNew: _startNewRequest,
+                ),
+                if (_result!.nearbyLocations.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Yakınınızdaki geri dönüşüm noktaları',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  ..._buildNearbySuggestionCards(_result!.nearbyLocations),
+                ],
+              ],
+              const SizedBox(height: 24),
             ],
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
