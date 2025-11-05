@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../services/api_service.dart';
+import 'pickup_request_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -17,6 +19,10 @@ class _MapScreenState extends State<MapScreen> {
   List<RecyclingPoint> _points = const [];
   RecyclingPoint? _selectedPoint;
   String? _errorMessage;
+  static const double _minZoom = 3;
+  static const double _maxZoom = 18;
+  static const double _zoomStep = 1.2;
+  bool _showWebHint = kIsWeb;
 
   @override
   void initState() {
@@ -76,6 +82,30 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _focusOnPoint(RecyclingPoint point) {
+    final target = LatLng(point.latitude, point.longitude);
+    final camera = _mapController.camera;
+    final zoom = camera.zoom.isFinite ? camera.zoom : 14;
+    _mapController.move(target, zoom.clamp(10, _maxZoom).toDouble());
+    setState(() {
+      _selectedPoint = point;
+      _showWebHint = false;
+    });
+  }
+
+  void _zoomBy(double delta) {
+    final camera = _mapController.camera;
+    final targetZoom = (camera.zoom + delta).clamp(_minZoom, _maxZoom).toDouble();
+    _mapController.move(camera.center, targetZoom);
+    if (_showWebHint) {
+      setState(() => _showWebHint = false);
+    }
+  }
+
+  void _zoomIn() => _zoomBy(_zoomStep);
+
+  void _zoomOut() => _zoomBy(-_zoomStep);
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -111,7 +141,10 @@ class _MapScreenState extends State<MapScreen> {
             alignment: Alignment.topCenter,
             child: GestureDetector(
               onTap: () {
-                setState(() => _selectedPoint = point);
+                setState(() {
+                  _selectedPoint = point;
+                  _showWebHint = false;
+                });
               },
               child: Icon(
                 Icons.location_on,
@@ -129,6 +162,8 @@ class _MapScreenState extends State<MapScreen> {
         ? LatLng(_points.first.latitude, _points.first.longitude)
         : const LatLng(39.0, 35.0);
 
+    final hasSelection = _selectedPoint != null;
+
     return Stack(
       children: [
         FlutterMap(
@@ -139,7 +174,12 @@ class _MapScreenState extends State<MapScreen> {
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
             ),
-            onTap: (_, __) => setState(() => _selectedPoint = null),
+            onTap: (_, __) {
+              setState(() {
+                _selectedPoint = null;
+                _showWebHint = false;
+              });
+            },
           ),
           children: [
             TileLayer(
@@ -149,6 +189,101 @@ class _MapScreenState extends State<MapScreen> {
             ),
             MarkerLayer(markers: markers),
           ],
+        ),
+        if (_points.isNotEmpty)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (context, index) {
+                      final point = _points[index];
+                      final selected = point.id == _selectedPoint?.id;
+                      return ChoiceChip(
+                        selected: selected,
+                        label: Text(point.name, overflow: TextOverflow.ellipsis),
+                        avatar: const Icon(Icons.recycling, size: 18),
+                        onSelected: (_) => _focusOnPoint(point),
+                        selectedColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemCount: _points.length,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (_showWebHint)
+          Positioned(
+            left: 16,
+            top: 16,
+            right: 16,
+            child: SafeArea(
+              child: _WebHelpCard(onClose: () => setState(() => _showWebHint = false)),
+            ),
+          ),
+        Positioned(
+          right: 16,
+          bottom: hasSelection ? 160 : 24,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MapControlButton(
+                  icon: Icons.add,
+                  tooltip: 'Yakınlaştır',
+                  onPressed: _zoomIn,
+                ),
+                const SizedBox(height: 12),
+                _MapControlButton(
+                  icon: Icons.remove,
+                  tooltip: 'Uzaklaştır',
+                  onPressed: _zoomOut,
+                ),
+                if (_points.length > 1) ...[
+                  const SizedBox(height: 12),
+                  _MapControlButton(
+                    icon: Icons.center_focus_strong,
+                    tooltip: 'Tüm noktaları göster',
+                    onPressed: () => _fitCameraToPoints(_points),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          bottom: hasSelection ? 180 : 96,
+          child: SafeArea(
+            top: false,
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PickupRequestScreen(),
+                    fullscreenDialog: true,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delivery_dining),
+              label: const Text('Kurye talep et'),
+            ),
+          ),
         ),
         if (_selectedPoint != null)
           Positioned(
@@ -198,6 +333,77 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WebHelpCard extends StatelessWidget {
+  const _WebHelpCard({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(16),
+      color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Chrome üzerinde haritayı incelemek için fare ile sürükleyebilir, '
+                'yakınlaştırma butonlarını kullanabilir veya Ctrl tuşuna basıp '
+                'mouse tekerleğini çevirebilirsin.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Kapat',
+              onPressed: onClose,
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapControlButton extends StatelessWidget {
+  const _MapControlButton({
+    required this.icon,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            height: 44,
+            width: 44,
+            child: Icon(icon, size: 22),
+          ),
         ),
       ),
     );
