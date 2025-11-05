@@ -34,8 +34,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
 
   void _onLocationSelected(LatLng location) {
     final camera = _mapController.camera;
-    final currentZoom = camera.zoom.isFinite ? camera.zoom : 13;
-    final targetZoom = currentZoom < 14 ? 14.0 : currentZoom;
+    final currentZoom = camera.zoom.isFinite ? camera.zoom : 13.0;
+    final double targetZoom = currentZoom < 14 ? 14.0 : currentZoom;
     _mapController.move(location, targetZoom);
 
     setState(() {
@@ -148,52 +148,54 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
             const SizedBox(height: 24),
             Text('Toplama detayları', style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: _material,
-                    decoration: const InputDecoration(labelText: 'Atık türü'),
-                    items: const [
-                      DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
-                      DropdownMenuItem(value: 'glass', child: Text('Cam')),
-                      DropdownMenuItem(value: 'paper', child: Text('Kağıt')),
-                      DropdownMenuItem(value: 'metal', child: Text('Metal')),
-                      DropdownMenuItem(value: 'electronics', child: Text('Elektronik')),
-                    ],
-                    onChanged: (value) => setState(() => _material = value ?? 'plastic'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _weightController,
-                    decoration: const InputDecoration(labelText: 'Ağırlık (kg)'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Lütfen ağırlık giriniz';
-                      }
-                      final parsed = double.tryParse(value.replaceAll(',', '.'));
-                      if (parsed == null || parsed <= 0) {
-                        return 'Geçerli bir değer giriniz';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _submitting ? null : _submit,
-                    icon: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.delivery_dining),
-                    label: Text(_submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
-                  ),
-                ],
+            Material(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _material,
+                      decoration: const InputDecoration(labelText: 'Atık türü'),
+                      items: const [
+                        DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
+                        DropdownMenuItem(value: 'glass', child: Text('Cam')),
+                        DropdownMenuItem(value: 'paper', child: Text('Kağıt')),
+                        DropdownMenuItem(value: 'metal', child: Text('Metal')),
+                        DropdownMenuItem(value: 'electronics', child: Text('Elektronik')),
+                      ],
+                      onChanged: (value) => setState(() => _material = value ?? 'plastic'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _weightController,
+                      decoration: const InputDecoration(labelText: 'Ağırlık (kg)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Lütfen ağırlık giriniz';
+                        }
+                        final parsed = double.tryParse(value.replaceAll(',', '.'));
+                        if (parsed == null || parsed <= 0) {
+                          return 'Geçerli bir değer giriniz';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _submitting ? null : _submit,
+                      icon: _submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delivery_dining),
+                      label: Text(_submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (_statusMessage != null) ...[
@@ -250,6 +252,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
+                onTap: (_, latLng) => _onLocationSelected(latLng),
                 onLongPress: (_, latLng) => _onLocationSelected(latLng),
               ),
               children: [
@@ -286,8 +289,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Teslim alınacak noktayı işaretlemek için harita üzerinde uzun basın. '
-                'Konumu güncellemek istediğinizde tekrar uzun basabilirsiniz.',
+                'Teslim alınacak noktayı işaretlemek için harita üzerine tıklayın. '
+                'Konumu güncellemek istediğinizde tekrar tıklayabilirsiniz.',
                 style: theme.textTheme.bodySmall,
               ),
             ),

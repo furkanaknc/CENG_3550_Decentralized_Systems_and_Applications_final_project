@@ -90,43 +90,6 @@ class ApiService {
 
   static const double _defaultLatitude = 41.0082;
   static const double _defaultLongitude = 28.9784;
-  static const List<String> _defaultAcceptedMaterials = [
-    'plastik',
-    'cam',
-    'kağıt',
-    'metal',
-  ];
-
-  static final List<RecyclingPoint> _fallbackRecyclingPoints = [
-    RecyclingPoint(
-      id: 'demo-besiktas',
-      name: 'Beşiktaş Geri Dönüşüm Merkezi',
-      acceptedMaterials: const ['plastik', 'cam', 'kağıt', 'metal'],
-      latitude: 41.0438,
-      longitude: 29.0027,
-    ),
-    RecyclingPoint(
-      id: 'demo-kadikoy',
-      name: 'Kadıköy Ayrıştırma Tesisi',
-      acceptedMaterials: const ['plastik', 'cam', 'kağıt'],
-      latitude: 40.9889,
-      longitude: 29.0250,
-    ),
-    RecyclingPoint(
-      id: 'demo-uskudar',
-      name: 'Üsküdar Geri Kazanım Noktası',
-      acceptedMaterials: const ['plastik', 'kağıt', 'metal'],
-      latitude: 41.0245,
-      longitude: 29.0151,
-    ),
-    RecyclingPoint(
-      id: 'demo-sisli',
-      name: 'Şişli Geri Dönüşüm Merkezi',
-      acceptedMaterials: const ['plastik', 'cam', 'kağıt', 'metal', 'elektronik'],
-      latitude: 41.0607,
-      longitude: 28.9873,
-    ),
-  ];
 
   final http.Client _client = http.Client();
   late String _baseUrl;
@@ -169,23 +132,7 @@ class ApiService {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final points = _mapRecyclingPoints(payload['locations'] as List<dynamic>?);
-
-    if (points.isNotEmpty) {
-      return points;
-    }
-
-    return _fallbackRecyclingPoints
-        .map(
-          (point) => RecyclingPoint(
-            id: point.id,
-            name: point.name,
-            acceptedMaterials: point.acceptedMaterials,
-            latitude: point.latitude,
-            longitude: point.longitude,
-          ),
-        )
-        .toList(growable: false);
+    return _mapRecyclingPoints(payload['locations'] as List<dynamic>?);
   }
 
   Future<PickupRequestResult> requestPickup({
@@ -292,9 +239,7 @@ class ApiService {
       id: location['id']?.toString() ??
           'point-${latitude.toStringAsFixed(4)}-${longitude.toStringAsFixed(4)}',
       name: location['name']?.toString() ?? 'Geri dönüşüm noktası',
-      acceptedMaterials: acceptedMaterials.isNotEmpty
-          ? acceptedMaterials
-          : _defaultAcceptedMaterials,
+      acceptedMaterials: acceptedMaterials,
       latitude: latitude,
       longitude: longitude,
     );
