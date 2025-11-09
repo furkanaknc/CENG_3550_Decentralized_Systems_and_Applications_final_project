@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/login_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/pickup_request_screen.dart';
 import 'screens/rewards_screen.dart';
+import 'screens/courier_pickups_screen.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
@@ -20,7 +23,11 @@ class GreenCycleApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const HomeShell(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LoginScreen(),
+        '/home': (context) => const HomeShell(),
+      },
     );
   }
 }
@@ -33,21 +40,119 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  final AuthService _auth = AuthService();
   int _index = 0;
 
-  final _pages = const [MapScreen(), PickupRequestScreen(), RewardsScreen()];
+  List<Widget> get _userPages => const [
+        MapScreen(),
+        PickupRequestScreen(),
+        RewardsScreen(),
+      ];
+
+  List<Widget> get _courierPages => const [
+        CourierPickupsScreen(),
+        MapScreen(),
+      ];
+
+  List<NavigationDestination> get _userDestinations => const [
+        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
+        NavigationDestination(icon: Icon(Icons.recycling), label: 'Teslim'),
+        NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Ödüller'),
+      ];
+
+  List<NavigationDestination> get _courierDestinations => const [
+        NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Talepler'),
+        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    if (!_auth.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/');
+        }
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Çıkış Yap'),
+        content: const Text('Çıkış yapmak istediğinizden emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Çıkış Yap'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _auth.logout();
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = _auth.currentUser;
+    final isCourier = user?.isCourier ?? false;
+    final pages = isCourier ? _courierPages : _userPages;
+    final destinations = isCourier ? _courierDestinations : _userDestinations;
+
+    // Reset index if it's out of bounds
+    if (_index >= pages.length) {
+      _index = 0;
+    }
+
     return Scaffold(
-      body: _pages[_index],
+      appBar: AppBar(
+        title: const Text('Green Cycle'),
+        backgroundColor: Colors.green.shade700,
+        foregroundColor: Colors.white,
+        actions: [
+          // Role badge
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              user?.role.toUpperCase() ?? 'USER',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Çıkış Yap',
+          ),
+        ],
+      ),
+      body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
-          NavigationDestination(icon: Icon(Icons.recycling), label: 'Teslim'),
-          NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Ödüller'),
-        ],
+        destinations: destinations,
         onDestinationSelected: (value) => setState(() => _index = value),
       ),
     );
