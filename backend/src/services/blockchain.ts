@@ -6,7 +6,7 @@ const pickupManagerAbi = [
   'function createPickup(string pickupId, string material, uint256 weightKg) returns (bytes32)',
   'function acceptPickup(string pickupId)',
   'function completePickup(string pickupId)',
-  'function pickups(bytes32 id) view returns (tuple(string pickupId,address user,address courier,uint8 status,string material,uint256 weightKg,uint256 createdAt,uint256 assignedAt,uint256 completedAt))',
+  'function pickups(bytes32 id) view returns (string pickupId,address user,address courier,uint8 status,string material,uint256 weightKg,uint256 createdAt,uint256 assignedAt,uint256 completedAt)',
   'function userRoles(address user) view returns (uint8)'
 ];
 
@@ -127,15 +127,27 @@ function toOnChainWeight(weightKg: number): bigint {
 async function getOnChainPickupStatus(pickupId: string): Promise<{ exists: boolean; status: number }> {
   const manager = ensurePickupManager();
   const pickupHash = ethers.id(pickupId);
-  const pickup = await manager.pickups(pickupHash);
 
-  const createdAtRaw = pickup.createdAt ?? pickup[6] ?? 0;
-  const statusRaw = pickup.status ?? pickup[3] ?? 0;
+  try {
+    const pickup = await manager.pickups(pickupHash);
 
-  const createdAt = ethers.toBigInt(createdAtRaw);
-  const status = typeof statusRaw === 'number' ? statusRaw : Number(statusRaw);
+    const createdAtRaw = pickup.createdAt ?? pickup[6] ?? 0;
+    const statusRaw = pickup.status ?? pickup[3] ?? 0;
 
-  return { exists: createdAt > 0n, status };
+    const createdAt =
+      typeof createdAtRaw === 'bigint' ? createdAtRaw : ethers.toBigInt(createdAtRaw ?? 0);
+    const status =
+      typeof statusRaw === 'number'
+        ? statusRaw
+        : typeof statusRaw === 'bigint'
+        ? Number(statusRaw)
+        : Number(statusRaw ?? 0);
+
+    return { exists: createdAt > 0n, status };
+  } catch (error) {
+    console.error('Failed to query on-chain pickup status', { pickupId, error });
+    return { exists: false, status: PICKUP_STATUS.Pending };
+  }
 }
 
 async function ensureRoleAssigned(address: string, role: number): Promise<string | undefined> {
@@ -194,22 +206,6 @@ export function isBlockchainConfigured(): boolean {
       config.pickupManagerAddress &&
       config.greenRewardAddress
   );
-}
-
-export async function syncPickupCreation(
-  pickup: PickupLike,
-  userWallet?: string
-): Promise<OnChainActionResult> {
-  if (!isBlockchainConfigured()) {
-    return { enabled: false };
-  }
-
-  const userAddress = normalizeAddress(userWallet);
-  if (!userAddress) {
-    throw new Error('Valid user wallet address is required for blockchain pickup creation');
-  }
-
-  return ensurePickupExists(pickup, userAddress);
 }
 
 export async function syncPickupAssignment(

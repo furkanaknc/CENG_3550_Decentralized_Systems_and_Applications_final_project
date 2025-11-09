@@ -8,14 +8,8 @@ import {
 } from '../repositories/pickupsRepository';
 import { ensureUserExists, getUserById } from '../repositories/usersRepository';
 import { getCourierByIdWithWallet } from '../repositories/couriersRepository';
-import {
-  assignCourierAndSync,
-  completePickupAndReward
-} from '../services/pickupLifecycle';
-import {
-  isBlockchainConfigured,
-  syncPickupCreation
-} from '../services/blockchain';
+import { assignCourierAndSync, completePickupAndReward } from '../services/pickupLifecycle';
+import { isBlockchainConfigured } from '../services/blockchain';
 
 export async function createPickup(req: Request, res: Response) {
   const { userId, material, weightKg, pickupLocation } = req.body;
@@ -34,24 +28,6 @@ export async function createPickup(req: Request, res: Response) {
   try {
     const pickupId = uuid();
     await ensureUserExists(userId);
-    const user = await getUserById(userId);
-    const walletHeader = req.headers['x-wallet-address'] as string | undefined;
-    const userWallet = user?.walletAddress || walletHeader;
-
-    if (isBlockchainConfigured() && !userWallet) {
-      return res.status(400).json({
-        message: 'Wallet address is required to record pickup on blockchain'
-      });
-    }
-
-    let blockchain;
-    if (userWallet) {
-      blockchain = await syncPickupCreation(
-        { id: pickupId, material, weightKg },
-        userWallet
-      );
-    }
-
     const pickup = await createPickupRecord({
       id: pickupId,
       userId,
@@ -63,8 +39,7 @@ export async function createPickup(req: Request, res: Response) {
 
     return res.status(201).json({
       pickup,
-      nearbyLocations: locations,
-      blockchain
+      nearbyLocations: locations
     });
   } catch (error) {
     console.error('Failed to create pickup', error);
