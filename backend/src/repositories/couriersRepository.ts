@@ -8,6 +8,7 @@ type CourierRow = {
   latitude: number | null;
   longitude: number | null;
   updated_at: Date;
+  user_id: string | null;
 };
 
 function mapCourier(row: CourierRow): Courier {
@@ -25,6 +26,19 @@ function mapCourier(row: CourierRow): Courier {
 export async function getCouriers(): Promise<Courier[]> {
   const { rows } = await query<CourierRow>('SELECT * FROM couriers ORDER BY name ASC');
   return rows.map(mapCourier);
+}
+
+export async function getCourierByUserId(userId: string): Promise<Courier | null> {
+  const { rows } = await query<CourierRow>(
+    'SELECT * FROM couriers WHERE user_id = $1 LIMIT 1',
+    [userId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return mapCourier(rows[0]);
 }
 
 export async function updateCourier(
