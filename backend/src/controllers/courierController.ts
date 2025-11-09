@@ -2,14 +2,20 @@ import { Response } from 'express';
 import {
   getCouriers,
   updateCourier,
-  getCourierByUserId
+  getCourierByUserId,
+  getCourierByIdWithWallet
 } from '../repositories/couriersRepository';
 import {
   listPickupsByStatus,
-  assignCourierToPickup,
-  completePickup
+  getPickupById
 } from '../repositories/pickupsRepository';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { getUserById } from '../repositories/usersRepository';
+import {
+  assignCourierAndSync,
+  completePickupAndReward
+} from '../services/pickupLifecycle';
+import { isBlockchainConfigured } from '../services/blockchain';
 
 export async function listCouriers(_req: AuthenticatedRequest, res: Response) {
   try {
@@ -139,12 +145,40 @@ export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
       });
     }
 
-    // Assign pickup to courier
-    const pickup = await assignCourierToPickup(pickupId, courier.id);
+    const pickup = await getPickupById(pickupId);
+
+    if (!pickup) {
+      return res.status(404).json({ message: 'Pickup not found' });
+    }
+
+    const pickupOwner = await getUserById(pickup.userId);
+    const userWallet = pickupOwner?.walletAddress;
+    const courierWallet = courier.walletAddress || req.user.walletAddress;
+
+    if (isBlockchainConfigured()) {
+      if (!userWallet) {
+        return res.status(400).json({
+          message: 'Pickup owner must have a wallet address for blockchain sync'
+        });
+      }
+
+      if (!courierWallet) {
+        return res.status(400).json({
+          message: 'Courier must have a wallet address for blockchain sync'
+        });
+      }
+    }
+
+    const { pickup: updatedPickup, blockchain } = await assignCourierAndSync(
+      pickup,
+      { id: courier.id, walletAddress: courierWallet },
+      userWallet
+    );
 
     res.json({
       message: 'Pickup accepted successfully',
-      pickup
+      pickup: updatedPickup,
+      blockchain
     });
   } catch (error) {
     console.error('Failed to accept pickup', error);
@@ -163,15 +197,37 @@ export async function completePickupByCourier(
   }
 
   try {
-    const pickup = await completePickup(pickupId);
+    const pickup = await getPickupById(pickupId);
 
     if (!pickup) {
       return res.status(404).json({ message: 'Pickup not found' });
     }
 
+    const pickupOwner = await getUserById(pickup.userId);
+    const courierWallet = pickup.courierId
+      ? (await getCourierByIdWithWallet(pickup.courierId))?.walletAddress ||
+        req.user.walletAddress
+      : req.user.walletAddress;
+
+    if (isBlockchainConfigured() && !pickupOwner?.walletAddress) {
+      return res.status(400).json({
+        message: 'Pickup owner must have a wallet address for blockchain sync'
+      });
+    }
+
+    const { pickup: completedPickup, carbon, points, blockchain } =
+      await completePickupAndReward(
+        pickup,
+        pickupOwner?.walletAddress,
+        courierWallet
+      );
+
     res.json({
       message: 'Pickup completed successfully',
-      pickup
+      pickup: completedPickup,
+      carbon,
+      points,
+      blockchain
     });
   } catch (error) {
     console.error('Failed to complete pickup', error);
