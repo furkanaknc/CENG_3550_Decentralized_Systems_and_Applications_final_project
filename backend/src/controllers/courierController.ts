@@ -1,9 +1,13 @@
 import { Response } from 'express';
-import { getCouriers, updateCourier, getCourierByUserId } from '../repositories/couriersRepository';
-import { 
-  listPickupsByStatus, 
-  assignCourierToPickup, 
-  completePickup 
+import {
+  getCouriers,
+  updateCourier,
+  getCourierByUserId
+} from '../repositories/couriersRepository';
+import {
+  listPickupsByStatus,
+  assignCourierToPickup,
+  completePickup
 } from '../repositories/pickupsRepository';
 import { AuthenticatedRequest } from '../middleware/auth';
 
@@ -17,7 +21,10 @@ export async function listCouriers(_req: AuthenticatedRequest, res: Response) {
   }
 }
 
-export async function updateCourierLocation(req: AuthenticatedRequest, res: Response) {
+export async function updateCourierLocation(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   const { id } = req.params;
   const { latitude, longitude, active } = req.body;
 
@@ -39,7 +46,10 @@ export async function updateCourierLocation(req: AuthenticatedRequest, res: Resp
   }
 }
 
-export async function getPendingPickups(_req: AuthenticatedRequest, res: Response) {
+export async function getPendingPickups(
+  _req: AuthenticatedRequest,
+  res: Response
+) {
   try {
     const pickups = await listPickupsByStatus('pending');
     res.json({ pickups });
@@ -57,7 +67,7 @@ export async function getMyPickups(req: AuthenticatedRequest, res: Response) {
   try {
     // Get courier ID from user
     const courier = await getCourierByUserId(req.user.id);
-    
+
     if (!courier) {
       return res.status(404).json({ message: 'Courier profile not found' });
     }
@@ -110,18 +120,17 @@ export async function getMyPickups(req: AuthenticatedRequest, res: Response) {
 
 export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
   const { id: pickupId } = req.params;
-  
+
   if (!req.user) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   try {
     const courier = await getCourierByUserId(req.user.id);
-    
-    
+
     if (!courier) {
       console.error('❌ No courier found for user_id:', req.user.id);
-      return res.status(404).json({ 
+      return res.status(404).json({
         message: 'Courier profile not found',
         debug: {
           userId: req.user.id,
@@ -132,10 +141,10 @@ export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
 
     // Assign pickup to courier
     const pickup = await assignCourierToPickup(pickupId, courier.id);
-    
-    res.json({ 
+
+    res.json({
       message: 'Pickup accepted successfully',
-      pickup 
+      pickup
     });
   } catch (error) {
     console.error('Failed to accept pickup', error);
@@ -143,7 +152,10 @@ export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
   }
 }
 
-export async function completePickupByCourier(req: AuthenticatedRequest, res: Response) {
+export async function completePickupByCourier(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   const { id: pickupId } = req.params;
 
   if (!req.user) {
@@ -157,9 +169,9 @@ export async function completePickupByCourier(req: AuthenticatedRequest, res: Re
       return res.status(404).json({ message: 'Pickup not found' });
     }
 
-    res.json({ 
+    res.json({
       message: 'Pickup completed successfully',
-      pickup 
+      pickup
     });
   } catch (error) {
     console.error('Failed to complete pickup', error);
