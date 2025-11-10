@@ -44,7 +44,6 @@ export async function runMigrations(): Promise<void> {
       await client.query(sql);
       await recordMigration(file);
       await client.query('COMMIT');
-      console.log(`Applied migration ${file}`);
     } catch (error) {
       await client.query('ROLLBACK');
       console.error(`Failed to run migration ${file}`);

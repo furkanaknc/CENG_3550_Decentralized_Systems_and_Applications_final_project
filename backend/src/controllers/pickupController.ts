@@ -1,23 +1,15 @@
 import { Request, Response } from 'express';
+import { v4 as uuid } from 'uuid';
 import mapService from '../services/maps';
 import {
-  calculateGreenPoints,
-  estimateCarbonSavings
-} from '../services/analytics';
-import { v4 as uuid } from 'uuid';
-import {
-  assignCourierToPickup,
-  completePickup as completePickupRecord,
   createPickup as createPickupRecord,
   getPickupById,
-  listPickups as listPickupRecords,
-  saveCarbonReport
+  listPickups as listPickupRecords
 } from '../repositories/pickupsRepository';
-import {
-  ensureUserExists,
-  addGreenPoints
-} from '../repositories/usersRepository';
-import { getCouriers } from '../repositories/couriersRepository';
+import { ensureUserExists, getUserById } from '../repositories/usersRepository';
+import { getCourierByIdWithWallet } from '../repositories/couriersRepository';
+import { assignCourierAndSync, completePickupAndReward } from '../services/pickupLifecycle';
+import { isBlockchainConfigured } from '../services/blockchain';
 
 export async function createPickup(req: Request, res: Response) {
   const { userId, material, weightKg, pickupLocation } = req.body;
@@ -45,7 +37,10 @@ export async function createPickup(req: Request, res: Response) {
     });
     const locations = await mapService.findNearbyLocations(coordinates);
 
-    return res.status(201).json({ pickup, nearbyLocations: locations });
+    return res.status(201).json({
+      pickup,
+      nearbyLocations: locations
+    });
   } catch (error) {
     console.error('Failed to create pickup', error);
     return res.status(500).json({ message: 'Pickup could not be created' });
@@ -78,15 +73,32 @@ export async function assignCourier(req: Request, res: Response) {
       return res.status(404).json({ message: 'Pickup not found' });
     }
 
-    const couriers = await getCouriers();
-    const courierExists = couriers.some((courier) => courier.id === courierId);
-    if (!courierExists) {
+    const courier = await getCourierByIdWithWallet(courierId);
+    if (!courier) {
       return res.status(404).json({ message: 'Courier not found' });
     }
 
-    const updatedPickup = await assignCourierToPickup(
-      id,
-      courierId,
+    const user = await getUserById(pickup.userId);
+    const userWallet = user?.walletAddress;
+
+    if (isBlockchainConfigured()) {
+      if (!userWallet) {
+        return res.status(400).json({
+          message: 'Pickup owner must have a wallet address for blockchain sync'
+        });
+      }
+
+      if (!courier.walletAddress) {
+        return res.status(400).json({
+          message: 'Courier must have a wallet address for blockchain sync'
+        });
+      }
+    }
+
+    const { pickup: updatedPickup, blockchain } = await assignCourierAndSync(
+      pickup,
+      { id: courier.id, walletAddress: courier.walletAddress },
+      userWallet,
       dropoffLocation
     );
 
@@ -97,7 +109,7 @@ export async function assignCourier(req: Request, res: Response) {
         )
       : undefined;
 
-    res.json({ pickup: updatedPickup, route });
+    res.json({ pickup: updatedPickup, route, blockchain });
   } catch (error) {
     console.error('Failed to assign courier', error);
     res.status(500).json({ message: 'Unable to assign courier' });
@@ -108,18 +120,30 @@ export async function completePickup(req: Request, res: Response) {
   const { id } = req.params;
 
   try {
-    const pickup = await completePickupRecord(id);
+    const pickup = await getPickupById(id);
     if (!pickup) {
       return res.status(404).json({ message: 'Pickup not found' });
     }
 
-    const carbon = estimateCarbonSavings(pickup);
-    const points = calculateGreenPoints(pickup);
+    const user = await getUserById(pickup.userId);
+    const courierWallet = pickup.courierId
+      ? (await getCourierByIdWithWallet(pickup.courierId))?.walletAddress
+      : undefined;
 
-    await saveCarbonReport(pickup.id, carbon.estimatedSavingKg);
-    await addGreenPoints(pickup.userId, points);
+    if (isBlockchainConfigured() && !user?.walletAddress) {
+      return res.status(400).json({
+        message: 'Pickup owner must have a wallet address for blockchain sync'
+      });
+    }
 
-    res.json({ pickup, carbon, points });
+    const { pickup: completedPickup, carbon, points, blockchain } =
+      await completePickupAndReward(
+        pickup,
+        user?.walletAddress,
+        courierWallet
+      );
+
+    res.json({ pickup: completedPickup, carbon, points, blockchain });
   } catch (error) {
     console.error('Failed to complete pickup', error);
     res.status(500).json({ message: 'Unable to complete pickup' });

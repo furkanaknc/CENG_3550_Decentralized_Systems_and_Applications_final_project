@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 class RecyclingPoint {
   final String id;
@@ -80,13 +81,15 @@ class ApiException implements Exception {
 class ApiService {
   ApiService._internal() {
     _baseUrl = _sanitizeBaseUrl(
-      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:4000'
+      dotenv.env['API_BASE_URL'] ?? 'http://localhost:4000'
     );
   }
 
   static final ApiService _singleton = ApiService._internal();
 
   factory ApiService() => _singleton;
+
+  final AuthService _auth = AuthService();
 
   static const double _defaultLatitude = 41.0082;
   static const double _defaultLongitude = 28.9784;
@@ -141,11 +144,17 @@ class ApiService {
     double? latitude,
     double? longitude,
   }) async {
+    final userId = _auth.currentUser?.id ?? 'demo-user';
+    final headers = {
+      'Content-Type': 'application/json',
+      ..._auth.getAuthHeaders(),
+    };
+
     final response = await _client.post(
       _uri('/api/pickups'),
-      headers: const {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
-        'userId': 'demo-user',
+        'userId': userId,
         'material': material,
         'weightKg': weightKg,
         'pickupLocation': {
@@ -205,6 +214,110 @@ class ApiService {
       return DateTime.tryParse(value);
     }
     return null;
+  }
+
+  /// Kurye için bekleyen talepleri getir
+  Future<List<PickupSummary>> getPendingPickups() async {
+    final headers = _auth.getAuthHeaders();
+    
+    final response = await _client.get(
+      _uri('/api/couriers/pickups/pending'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Bekleyen talepler alınamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pickups = payload['pickups'] as List<dynamic>? ?? [];
+    
+    return pickups
+        .map(_parsePickupSummary)
+        .whereType<PickupSummary>()
+        .toList();
+  }
+
+  /// Kurye için kabul edilmiş (assigned) talepleri getir
+  Future<List<PickupSummary>> getMyPickups() async {
+    final headers = _auth.getAuthHeaders();
+    
+    final response = await _client.get(
+      _uri('/api/couriers/my-pickups'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Kabul edilmiş talepler alınamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pickups = payload['pickups'] as List<dynamic>? ?? [];
+    
+    return pickups
+        .map(_parsePickupSummary)
+        .whereType<PickupSummary>()
+        .toList();
+  }
+
+  /// Kurye için talep kabul etme
+  Future<PickupSummary> acceptPickup(String pickupId) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      ..._auth.getAuthHeaders(),
+    };
+
+    final response = await _client.post(
+      _uri('/api/couriers/pickups/$pickupId/accept'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Talep kabul edilemedi', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pickup = payload['pickup'] as Map<String, dynamic>;
+    return _parsePickupSummary(pickup)!;
+  }
+
+  /// Kurye için talep tamamlama
+  Future<PickupSummary> completePickup(String pickupId) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      ..._auth.getAuthHeaders(),
+    };
+
+    final response = await _client.post(
+      _uri('/api/couriers/pickups/$pickupId/complete'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Talep tamamlanamadı', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pickup = payload['pickup'] as Map<String, dynamic>;
+    return _parsePickupSummary(pickup)!;
+  }
+
+  PickupSummary? _parsePickupSummary(dynamic raw) {
+    final pickup = raw as Map<String, dynamic>?;
+    if (pickup == null) return null;
+
+    final pickupLocation = pickup['pickupLocation'] as Map<String, dynamic>?;
+    
+    return PickupSummary(
+      id: pickup['id']?.toString() ?? '',
+      material: pickup['material']?.toString() ?? '',
+      weightKg: (pickup['weightKg'] as num?)?.toDouble() ?? 0.0,
+      status: pickup['status']?.toString() ?? 'pending',
+      latitude: (pickupLocation?['latitude'] as num?)?.toDouble() ?? _defaultLatitude,
+      longitude: (pickupLocation?['longitude'] as num?)?.toDouble() ?? _defaultLongitude,
+      createdAt: _parseDateTime(pickup['createdAt']),
+      updatedAt: _parseDateTime(pickup['updatedAt']),
+    );
   }
 
   List<RecyclingPoint> _mapRecyclingPoints(List<dynamic>? rawLocations) {

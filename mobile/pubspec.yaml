@@ -11,6 +11,11 @@ dependencies:
   http: ^1.2.1
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
+  web3dart: ^2.7.3
+  shared_preferences: ^2.2.2
+  walletconnect_flutter_v2: ^2.1.15
+  url_launcher: ^6.2.5
+  qr_flutter: ^4.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

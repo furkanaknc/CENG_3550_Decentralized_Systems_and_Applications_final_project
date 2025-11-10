@@ -36,6 +36,10 @@ const defaultCourier = {
 beforeAll(() => {
   db.public.registerEnum('pickup_status', ['pending', 'assigned', 'completed']);
   db.public.none(migrationSql);
+  db.public.none(
+    `ALTER TABLE users ADD COLUMN wallet_address TEXT;
+     ALTER TABLE couriers ADD COLUMN user_id TEXT;`
+  );
 });
 
 beforeEach(async () => {

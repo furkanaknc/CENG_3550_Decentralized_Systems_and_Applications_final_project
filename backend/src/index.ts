@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRouter from './routes/auth';
 import pickupRouter from './routes/pickups';
 import courierRouter from './routes/couriers';
 import analyticsRouter from './routes/analytics';
@@ -14,6 +15,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRouter);
 app.use('/api/pickups', pickupRouter);
 app.use('/api/couriers', courierRouter);
 app.use('/api/analytics', analyticsRouter);
