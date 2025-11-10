@@ -10,6 +10,7 @@ import { ensureUserExists, getUserById } from '../repositories/usersRepository';
 import { getCourierByIdWithWallet } from '../repositories/couriersRepository';
 import { assignCourierAndSync, completePickupAndReward } from '../services/pickupLifecycle';
 import { isBlockchainConfigured } from '../services/blockchain';
+import { parseCourierApprovalPayload } from '../utils/courierApproval';
 
 export async function createPickup(req: Request, res: Response) {
   const { userId, material, weightKg, pickupLocation } = req.body;
@@ -67,6 +68,14 @@ export async function assignCourier(req: Request, res: Response) {
       .json({ message: 'dropoffLocation requires id and coordinates' });
   }
 
+  let courierApproval;
+
+  try {
+    courierApproval = parseCourierApprovalPayload(req.body?.courierApproval);
+  } catch (error) {
+    return res.status(400).json({ message: (error as Error).message });
+  }
+
   try {
     const pickup = await getPickupById(id);
     if (!pickup) {
@@ -99,7 +108,8 @@ export async function assignCourier(req: Request, res: Response) {
       pickup,
       { id: courier.id, walletAddress: courier.walletAddress },
       userWallet,
-      dropoffLocation
+      dropoffLocation,
+      courierApproval
     );
 
     const route = dropoffLocation
@@ -118,6 +128,14 @@ export async function assignCourier(req: Request, res: Response) {
 
 export async function completePickup(req: Request, res: Response) {
   const { id } = req.params;
+
+  let courierApproval;
+
+  try {
+    courierApproval = parseCourierApprovalPayload(req.body?.courierApproval);
+  } catch (error) {
+    return res.status(400).json({ message: (error as Error).message });
+  }
 
   try {
     const pickup = await getPickupById(id);
@@ -140,7 +158,8 @@ export async function completePickup(req: Request, res: Response) {
       await completePickupAndReward(
         pickup,
         user?.walletAddress,
-        courierWallet
+        courierWallet,
+        courierApproval
       );
 
     res.json({ pickup: completedPickup, carbon, points, blockchain });

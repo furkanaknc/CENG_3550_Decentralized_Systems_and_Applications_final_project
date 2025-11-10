@@ -16,6 +16,7 @@ import {
   completePickupAndReward
 } from '../services/pickupLifecycle';
 import { isBlockchainConfigured } from '../services/blockchain';
+import { parseCourierApprovalPayload } from '../utils/courierApproval';
 
 export async function listCouriers(_req: AuthenticatedRequest, res: Response) {
   try {
@@ -131,6 +132,14 @@ export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
+  let courierApproval;
+
+  try {
+    courierApproval = parseCourierApprovalPayload(req.body?.courierApproval);
+  } catch (error) {
+    return res.status(400).json({ message: (error as Error).message });
+  }
+
   try {
     const courier = await getCourierByUserId(req.user.id);
 
@@ -167,12 +176,21 @@ export async function acceptPickup(req: AuthenticatedRequest, res: Response) {
           message: 'Courier must have a wallet address for blockchain sync'
         });
       }
+
+      if (!courierApproval) {
+        return res.status(400).json({
+          message:
+            'Courier approval signature is required to accept pickup on blockchain'
+        });
+      }
     }
 
     const { pickup: updatedPickup, blockchain } = await assignCourierAndSync(
       pickup,
       { id: courier.id, walletAddress: courierWallet },
-      userWallet
+      userWallet,
+      undefined,
+      courierApproval
     );
 
     res.json({
@@ -196,6 +214,14 @@ export async function completePickupByCourier(
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
+  let courierApproval;
+
+  try {
+    courierApproval = parseCourierApprovalPayload(req.body?.courierApproval);
+  } catch (error) {
+    return res.status(400).json({ message: (error as Error).message });
+  }
+
   try {
     const pickup = await getPickupById(pickupId);
 
@@ -209,17 +235,27 @@ export async function completePickupByCourier(
         req.user.walletAddress
       : req.user.walletAddress;
 
-    if (isBlockchainConfigured() && !pickupOwner?.walletAddress) {
-      return res.status(400).json({
-        message: 'Pickup owner must have a wallet address for blockchain sync'
-      });
+    if (isBlockchainConfigured()) {
+      if (!pickupOwner?.walletAddress) {
+        return res.status(400).json({
+          message: 'Pickup owner must have a wallet address for blockchain sync'
+        });
+      }
+
+      if (!courierApproval) {
+        return res.status(400).json({
+          message:
+            'Courier approval signature is required to complete pickup on blockchain'
+        });
+      }
     }
 
     const { pickup: completedPickup, carbon, points, blockchain } =
       await completePickupAndReward(
         pickup,
         pickupOwner?.walletAddress,
-        courierWallet
+        courierWallet,
+        courierApproval
       );
 
     res.json({
