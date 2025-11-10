@@ -12,6 +12,8 @@ export interface Courier {
   name: string;
   active: boolean;
   currentLocation: Coordinates;
+  userId?: string;
+  walletAddress?: string;
 }
 
 export interface RecyclingLocation {

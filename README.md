@@ -58,6 +58,23 @@ npm run dev
 
 **Not:** Backend varsayılan olarak `http://localhost:4000` adresinde çalışır.
 
+#### Blockchain entegrasyonu için ortam değişkenleri
+
+Blockchain işlemlerini backend üzerinden tetiklemek için `backend/.env` dosyanıza aşağıdaki değerleri ekleyin:
+
+```
+BLOCKCHAIN_RPC_URL=https://sepolia.infura.io/v3/<PROJE_ID>
+BLOCKCHAIN_PRIVATE_KEY=0x<platform-operator-private-key>
+PICKUP_MANAGER_ADDRESS=0x<deployed-pickup-manager-address>
+GREEN_REWARD_ADDRESS=0x<deployed-green-reward-address>
+```
+
+> ⚠️ Private key bilgisinin sıcak cüzdanlarda saklanması önerilmez. Geliştirme ortamında ayrı bir operatör cüzdanı kullanın ve
+> `.env` dosyasını sürüm kontrolüne eklemeyin.
+
+Yeşil ödül kontratı, ağırlığı kilogramın %100'ü (ör: 1.5 kg → `150`) olarak kaydeder. Bu nedenle backend, zincire gönderilen
+verileri aynı ölçekte (×100) normalize eder.
+
 #### Veritabanı Tabloları
 
 Migration'lar aşağıdaki tabloları oluşturur:
