@@ -68,7 +68,12 @@ function readConfig(): Config {
 function getRequiredConfig(): RequiredConfig {
   const config = readConfig();
 
-  if (!config.rpcUrl || !config.privateKey || !config.pickupManagerAddress || !config.greenRewardAddress) {
+  if (
+    !config.rpcUrl ||
+    !config.privateKey ||
+    !config.pickupManagerAddress ||
+    !config.greenRewardAddress
+  ) {
     throw new Error('Blockchain integration is not fully configured');
   }
 
@@ -94,7 +99,11 @@ function ensureSigner(): ethers.Wallet {
 function ensurePickupManager(): ethers.Contract {
   if (!pickupManager) {
     const { pickupManagerAddress } = getRequiredConfig();
-    pickupManager = new ethers.Contract(pickupManagerAddress, pickupManagerAbi, ensureSigner());
+    pickupManager = new ethers.Contract(
+      pickupManagerAddress,
+      pickupManagerAbi,
+      ensureSigner()
+    );
   }
   return pickupManager;
 }
@@ -102,7 +111,11 @@ function ensurePickupManager(): ethers.Contract {
 function ensureGreenReward(): ethers.Contract {
   if (!greenReward) {
     const { greenRewardAddress } = getRequiredConfig();
-    greenReward = new ethers.Contract(greenRewardAddress, greenRewardAbi, ensureSigner());
+    greenReward = new ethers.Contract(
+      greenRewardAddress,
+      greenRewardAbi,
+      ensureSigner()
+    );
   }
   return greenReward;
 }
@@ -115,7 +128,10 @@ function normalizeAddress(address?: string | null): string | null {
   try {
     return ethers.getAddress(address);
   } catch (error) {
-    console.error('Invalid address provided for blockchain sync', { address, error });
+    console.error('Invalid address provided for blockchain sync', {
+      address,
+      error
+    });
     return null;
   }
 }
@@ -124,7 +140,9 @@ function toOnChainWeight(weightKg: number): bigint {
   return BigInt(Math.round(weightKg * 100));
 }
 
-async function getOnChainPickupStatus(pickupId: string): Promise<{ exists: boolean; status: number }> {
+async function getOnChainPickupStatus(
+  pickupId: string
+): Promise<{ exists: boolean; status: number }> {
   const manager = ensurePickupManager();
   const pickupHash = ethers.id(pickupId);
 
@@ -135,7 +153,9 @@ async function getOnChainPickupStatus(pickupId: string): Promise<{ exists: boole
     const statusRaw = pickup.status ?? pickup[3] ?? 0;
 
     const createdAt =
-      typeof createdAtRaw === 'bigint' ? createdAtRaw : ethers.toBigInt(createdAtRaw ?? 0);
+      typeof createdAtRaw === 'bigint'
+        ? createdAtRaw
+        : ethers.toBigInt(createdAtRaw ?? 0);
     const status =
       typeof statusRaw === 'number'
         ? statusRaw
@@ -145,26 +165,53 @@ async function getOnChainPickupStatus(pickupId: string): Promise<{ exists: boole
 
     return { exists: createdAt > 0n, status };
   } catch (error) {
-    console.error('Failed to query on-chain pickup status', { pickupId, error });
+    console.error('Failed to query on-chain pickup status', {
+      pickupId,
+      error
+    });
     return { exists: false, status: PICKUP_STATUS.Pending };
   }
 }
 
-async function ensureRoleAssigned(address: string, role: number): Promise<string | undefined> {
+async function ensureRoleAssigned(
+  address: string,
+  role: number
+): Promise<string | undefined> {
   const manager = ensurePickupManager();
   const currentRoleRaw = await manager.userRoles(address);
-  const currentRole = typeof currentRoleRaw === 'number' ? currentRoleRaw : Number(currentRoleRaw);
+  const currentRole =
+    typeof currentRoleRaw === 'number'
+      ? currentRoleRaw
+      : Number(currentRoleRaw);
 
   if (currentRole === role) {
     return undefined;
   }
 
-  const tx = await manager.assignRole(address, role);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  try {
+    const tx = await manager.assignRole(address, role);
+    const receipt = await tx.wait();
+    return receipt.hash;
+  } catch (error: any) {
+    // If transaction is already known (pending in mempool), we can safely proceed
+    if (
+      error.code === 'UNKNOWN_ERROR' &&
+      error.error?.message === 'already known'
+    ) {
+      console.log(
+        `⚠️ Role assignment transaction for ${address} is already pending, continuing...`
+      );
+      return 'pending';
+    } else {
+      throw error;
+    }
+  }
 }
 
-async function ensurePickupExists(pickup: PickupLike, userAddress: string): Promise<OnChainActionResult> {
+async function ensurePickupExists(
+  pickup: PickupLike,
+  userAddress: string
+): Promise<OnChainActionResult> {
   const summary: OnChainActionResult = { enabled: true };
   const manager = ensurePickupManager();
 
@@ -177,25 +224,63 @@ async function ensurePickupExists(pickup: PickupLike, userAddress: string): Prom
 
   if (!statusInfo.exists) {
     const weight = toOnChainWeight(pickup.weightKg);
-    const tx = await manager.createPickup(pickup.id, pickup.material, weight);
-    const receipt = await tx.wait();
-    summary.pickupCreatedTxHash = receipt.hash;
+
+    try {
+      const tx = await manager.createPickup(pickup.id, pickup.material, weight);
+      const receipt = await tx.wait();
+      summary.pickupCreatedTxHash = receipt.hash;
+    } catch (error: any) {
+      // If transaction is already known (pending in mempool), we can safely proceed
+      if (
+        error.code === 'UNKNOWN_ERROR' &&
+        error.error?.message === 'already known'
+      ) {
+        console.log(
+          `⚠️ Pickup creation transaction for ${pickup.id} is already pending, continuing...`
+        );
+        summary.pickupCreatedTxHash = 'pending';
+      } else {
+        throw error;
+      }
+    }
   }
 
   return summary;
 }
 
-async function mintReward(userAddress: string, pickup: PickupLike): Promise<{ txHash: string; amount: string }> {
+async function mintReward(
+  userAddress: string,
+  pickup: PickupLike
+): Promise<{ txHash: string; amount: string }> {
   const rewardContract = ensureGreenReward();
   const weight = toOnChainWeight(pickup.weightKg);
   const multiplierRaw = await rewardContract.materialWeights(pickup.material);
-  const multiplier = typeof multiplierRaw === 'number' ? multiplierRaw : Number(multiplierRaw);
+  const multiplier =
+    typeof multiplierRaw === 'number' ? multiplierRaw : Number(multiplierRaw);
   const rewardAmount = (weight * BigInt(multiplier)).toString();
 
-  const tx = await rewardContract.recordActivity(userAddress, pickup.material, weight);
-  const receipt = await tx.wait();
-
-  return { txHash: receipt.hash, amount: rewardAmount };
+  try {
+    const tx = await rewardContract.recordActivity(
+      userAddress,
+      pickup.material,
+      weight
+    );
+    const receipt = await tx.wait();
+    return { txHash: receipt.hash, amount: rewardAmount };
+  } catch (error: any) {
+    // If transaction is already known (pending in mempool), we can safely proceed
+    if (
+      error.code === 'UNKNOWN_ERROR' &&
+      error.error?.message === 'already known'
+    ) {
+      console.log(
+        `⚠️ Reward minting transaction for ${userAddress} is already pending, continuing...`
+      );
+      return { txHash: 'pending', amount: rewardAmount };
+    } else {
+      throw error;
+    }
+  }
 }
 
 export function isBlockchainConfigured(): boolean {
@@ -221,11 +306,15 @@ export async function syncPickupAssignment(
   const courierAddress = normalizeAddress(courierWallet);
 
   if (!userAddress) {
-    throw new Error('Valid user wallet address is required for blockchain assignment');
+    throw new Error(
+      'Valid user wallet address is required for blockchain assignment'
+    );
   }
 
   if (!courierAddress) {
-    throw new Error('Valid courier wallet address is required for blockchain assignment');
+    throw new Error(
+      'Valid courier wallet address is required for blockchain assignment'
+    );
   }
 
   const summary = await ensurePickupExists(pickup, userAddress);
@@ -240,14 +329,35 @@ export async function syncPickupAssignment(
     throw new Error(`Pickup ${pickup.id} could not be created on chain`);
   }
 
-  if (statusInfo.status === PICKUP_STATUS.Assigned || statusInfo.status === PICKUP_STATUS.Completed) {
+  if (
+    statusInfo.status === PICKUP_STATUS.Assigned ||
+    statusInfo.status === PICKUP_STATUS.Completed
+  ) {
     return summary;
   }
 
   const manager = ensurePickupManager();
-  const tx = await manager.acceptPickup(pickup.id);
-  const receipt = await tx.wait();
-  summary.pickupAcceptedTxHash = receipt.hash;
+
+  try {
+    const tx = await manager.acceptPickup(pickup.id);
+    const receipt = await tx.wait();
+    summary.pickupAcceptedTxHash = receipt.hash;
+  } catch (error: any) {
+    // If transaction is already known (pending in mempool), we can safely proceed
+    // The transaction will eventually be mined
+    if (
+      error.code === 'UNKNOWN_ERROR' &&
+      error.error?.message === 'already known'
+    ) {
+      console.log(
+        `⚠️ Transaction for pickup ${pickup.id} is already pending, continuing...`
+      );
+      summary.pickupAcceptedTxHash = 'pending';
+    } else {
+      // Re-throw other errors
+      throw error;
+    }
+  }
 
   return summary;
 }
@@ -263,7 +373,9 @@ export async function syncPickupCompletion(
 
   const userAddress = normalizeAddress(userWallet);
   if (!userAddress) {
-    throw new Error('Valid user wallet address is required for blockchain completion');
+    throw new Error(
+      'Valid user wallet address is required for blockchain completion'
+    );
   }
 
   const summary = await ensurePickupExists(pickup, userAddress);
@@ -276,7 +388,9 @@ export async function syncPickupCompletion(
   if (courierWallet) {
     const courierAddress = normalizeAddress(courierWallet);
     if (!courierAddress) {
-      throw new Error('Valid courier wallet address is required for blockchain completion');
+      throw new Error(
+        'Valid courier wallet address is required for blockchain completion'
+      );
     }
 
     const roleTxHash = await ensureRoleAssigned(courierAddress, ROLE.Courier);
@@ -291,9 +405,25 @@ export async function syncPickupCompletion(
 
   if (statusInfo.status === PICKUP_STATUS.Assigned) {
     const manager = ensurePickupManager();
-    const tx = await manager.completePickup(pickup.id);
-    const receipt = await tx.wait();
-    summary.pickupCompletedTxHash = receipt.hash;
+
+    try {
+      const tx = await manager.completePickup(pickup.id);
+      const receipt = await tx.wait();
+      summary.pickupCompletedTxHash = receipt.hash;
+    } catch (error: any) {
+      // If transaction is already known (pending in mempool), we can safely proceed
+      if (
+        error.code === 'UNKNOWN_ERROR' &&
+        error.error?.message === 'already known'
+      ) {
+        console.log(
+          `⚠️ Transaction for pickup completion ${pickup.id} is already pending, continuing...`
+        );
+        summary.pickupCompletedTxHash = 'pending';
+      } else {
+        throw error;
+      }
+    }
   }
 
   const reward = await mintReward(userAddress, pickup);
