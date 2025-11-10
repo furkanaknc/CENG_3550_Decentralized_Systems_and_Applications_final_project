@@ -15,7 +15,7 @@ import {
   assignCourierAndSync,
   completePickupAndReward
 } from '../services/pickupLifecycle';
-import { isBlockchainConfigured } from '../services/blockchain';
+import { isBlockchainConfigured, getCourierNonce } from '../services/blockchain';
 import { parseCourierApprovalPayload } from '../utils/courierApproval';
 
 export async function listCouriers(_req: AuthenticatedRequest, res: Response) {
@@ -268,5 +268,48 @@ export async function completePickupByCourier(
   } catch (error) {
     console.error('Failed to complete pickup', error);
     res.status(500).json({ message: 'Unable to complete pickup' });
+  }
+}
+
+export async function getCourierNonceForSigning(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const courier = await getCourierByUserId(req.user.id);
+
+    if (!courier) {
+      return res.status(404).json({ message: 'Courier profile not found' });
+    }
+
+    const courierWallet = courier.walletAddress || req.user.walletAddress;
+
+    if (!courierWallet) {
+      return res.status(400).json({ 
+        message: 'Courier wallet address not found' 
+      });
+    }
+
+    if (!isBlockchainConfigured()) {
+      return res.json({ 
+        nonce: 0,
+        blockchainEnabled: false
+      });
+    }
+
+    const nonce = await getCourierNonce(courierWallet);
+
+    res.json({
+      nonce: nonce.toString(),
+      address: courierWallet,
+      blockchainEnabled: true
+    });
+  } catch (error) {
+    console.error('Failed to get courier nonce', error);
+    res.status(500).json({ message: 'Unable to get courier nonce' });
   }
 }

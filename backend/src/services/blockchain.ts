@@ -9,7 +9,8 @@ const pickupManagerAbi = [
   'function completePickup(string pickupId)',
   'function completePickupWithSig(string pickupId, address courier, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
   'function pickups(bytes32 id) view returns (string pickupId,address user,address courier,uint8 status,string material,uint256 weightKg,uint256 createdAt,uint256 assignedAt,uint256 completedAt)',
-  'function userRoles(address user) view returns (uint8)'
+  'function userRoles(address user) view returns (uint8)',
+  'function nonces(address user) view returns (uint256)'
 ];
 
 const greenRewardAbi = [
@@ -519,4 +520,25 @@ function isAlreadyKnownError(error: any): boolean {
     error?.code === 'UNKNOWN_ERROR' &&
     error?.error?.message === 'already known'
   );
+}
+
+export async function getCourierNonce(courierAddress: string): Promise<bigint> {
+  if (!isBlockchainConfigured()) {
+    throw new Error('Blockchain is not configured');
+  }
+
+  const manager = ensurePickupManager();
+  const normalizedAddress = normalizeAddress(courierAddress);
+
+  if (!normalizedAddress) {
+    throw new Error('Invalid courier address');
+  }
+
+  try {
+    const nonce = await manager.nonces(normalizedAddress);
+    return BigInt(nonce.toString());
+  } catch (error) {
+    console.error('Failed to get courier nonce:', error);
+    throw new Error('Unable to retrieve courier nonce from blockchain');
+  }
 }
