@@ -9,7 +9,8 @@ import {
   isBlockchainConfigured,
   OnChainActionResult,
   syncPickupAssignment,
-  syncPickupCompletion
+  syncPickupCompletion,
+  type CourierApproval
 } from './blockchain';
 import { calculateGreenPoints, estimateCarbonSavings } from './analytics';
 
@@ -34,7 +35,8 @@ export async function assignCourierAndSync(
   pickup: PickupRequest,
   courier: CourierContext,
   userWallet?: string,
-  dropoff?: RecyclingLocation
+  dropoff?: RecyclingLocation,
+  courierApproval?: CourierApproval
 ): Promise<AssignmentResult> {
   if (isBlockchainConfigured()) {
     if (!userWallet) {
@@ -49,7 +51,8 @@ export async function assignCourierAndSync(
   const blockchain = await syncPickupAssignment(
     pickup,
     userWallet,
-    courier.walletAddress
+    courier.walletAddress,
+    courierApproval
   );
 
   const updatedPickup = await assignCourierToPickup(
@@ -64,7 +67,8 @@ export async function assignCourierAndSync(
 export async function completePickupAndReward(
   pickup: PickupRequest,
   userWallet?: string,
-  courierWallet?: string
+  courierWallet?: string,
+  courierApproval?: CourierApproval
 ): Promise<CompletionResult> {
   if (isBlockchainConfigured() && !userWallet) {
     throw new Error('User wallet address is required to finalize pickup on blockchain');
@@ -73,7 +77,8 @@ export async function completePickupAndReward(
   const blockchain = await syncPickupCompletion(
     pickup,
     userWallet,
-    courierWallet
+    courierWallet,
+    courierApproval
   );
 
   const completedPickup = await completePickupRecord(pickup.id);

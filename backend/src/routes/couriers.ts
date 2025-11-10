@@ -5,7 +5,8 @@ import {
   getPendingPickups,
   getMyPickups,
   acceptPickup,
-  completePickupByCourier
+  completePickupByCourier,
+  getCourierNonceForSigning
 } from '../controllers/courierController';
 import { authenticateWallet, requireRole } from '../middleware/auth';
 
@@ -15,6 +16,12 @@ const router = Router();
 router.get('/', listCouriers);
 
 // Courier-only endpoints
+router.get(
+  '/nonce',
+  authenticateWallet,
+  requireRole('courier', 'admin'),
+  getCourierNonceForSigning
+);
 router.get(
   '/pickups/pending',
   authenticateWallet,

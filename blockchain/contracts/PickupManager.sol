@@ -2,12 +2,15 @@
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 /**
  * @title PickupManager
  * @notice Manages pickup requests and courier assignments on-chain
  */
-contract PickupManager is Ownable {
+
+contract PickupManager is Ownable, EIP712 {
     enum PickupStatus { Pending, Assigned, Completed, Cancelled }
     
     enum UserRole { None, User, Courier, Admin }
@@ -36,6 +39,14 @@ contract PickupManager is Ownable {
     // Mapping from courier address to their active pickup count
     mapping(address => uint256) public courierActivePickups;
 
+    bytes32 private constant ACCEPT_TYPEHASH =
+        keccak256("AcceptPickup(string pickupId,address courier,uint256 nonce,uint256 deadline)");
+
+    bytes32 private constant COMPLETE_TYPEHASH =
+        keccak256("CompletePickup(string pickupId,address courier,uint256 nonce,uint256 deadline)");
+
+    mapping(address => uint256) public nonces;
+
     // Events
     event PickupCreated(
         bytes32 indexed pickupIdHash,
@@ -61,7 +72,7 @@ contract PickupManager is Ownable {
     
     event RoleAssigned(address indexed user, UserRole role);
 
-    constructor() Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) EIP712("PickupManager", "1") {
         // Assign admin role to contract deployer
         userRoles[msg.sender] = UserRole.Admin;
         emit RoleAssigned(msg.sender, UserRole.Admin);
@@ -87,6 +98,68 @@ contract PickupManager is Ownable {
         require(user != address(0), "Invalid address");
         userRoles[user] = role;
         emit RoleAssigned(user, role);
+    }
+
+    function _useNonce(address courier) internal returns (uint256 current) {
+        current = nonces[courier];
+        nonces[courier] = current + 1;
+    }
+
+    function _requireCourierRole(address courier) internal view {
+        require(
+            userRoles[courier] == UserRole.Courier || userRoles[courier] == UserRole.Admin,
+            "Unauthorized: courier role required"
+        );
+    }
+
+    function _verifyAcceptSignature(
+        string calldata pickupId,
+        address courier,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal returns (address) {
+        require(block.timestamp <= deadline, "Signature expired");
+        uint256 nonce = _useNonce(courier);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                ACCEPT_TYPEHASH,
+                keccak256(bytes(pickupId)),
+                courier,
+                nonce,
+                deadline
+            )
+        );
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(digest, v, r, s);
+        require(signer == courier, "Invalid courier signature");
+        return signer;
+    }
+
+    function _verifyCompleteSignature(
+        string calldata pickupId,
+        address courier,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal returns (address) {
+        require(block.timestamp <= deadline, "Signature expired");
+        uint256 nonce = _useNonce(courier);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                COMPLETE_TYPEHASH,
+                keccak256(bytes(pickupId)),
+                courier,
+                nonce,
+                deadline
+            )
+        );
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(digest, v, r, s);
+        require(signer == courier, "Invalid courier signature");
+        return signer;
     }
 
     /**
@@ -148,6 +221,32 @@ contract PickupManager is Ownable {
         emit PickupAssigned(pickupIdHash, pickupId, msg.sender, block.timestamp);
     }
 
+    function acceptPickupWithSig(
+        string calldata pickupId,
+        address courier,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        _requireCourierRole(courier);
+        _verifyAcceptSignature(pickupId, courier, deadline, v, r, s);
+
+        bytes32 pickupIdHash = keccak256(bytes(pickupId));
+        Pickup storage pickup = pickups[pickupIdHash];
+
+        require(pickup.createdAt > 0, "Pickup does not exist");
+        require(pickup.status == PickupStatus.Pending, "Pickup not available");
+
+        pickup.courier = courier;
+        pickup.status = PickupStatus.Assigned;
+        pickup.assignedAt = block.timestamp;
+
+        courierActivePickups[courier]++;
+
+        emit PickupAssigned(pickupIdHash, pickupId, courier, block.timestamp);
+    }
+
     /**
      * @notice Complete a pickup (only assigned courier can complete)
      */
@@ -167,6 +266,34 @@ contract PickupManager is Ownable {
         }
 
         emit PickupCompleted(pickupIdHash, pickupId, msg.sender, block.timestamp);
+    }
+
+    function completePickupWithSig(
+        string calldata pickupId,
+        address courier,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        _requireCourierRole(courier);
+        _verifyCompleteSignature(pickupId, courier, deadline, v, r, s);
+
+        bytes32 pickupIdHash = keccak256(bytes(pickupId));
+        Pickup storage pickup = pickups[pickupIdHash];
+
+        require(pickup.createdAt > 0, "Pickup does not exist");
+        require(pickup.status == PickupStatus.Assigned, "Pickup not assigned");
+        require(pickup.courier == courier, "Not the assigned courier");
+
+        pickup.status = PickupStatus.Completed;
+        pickup.completedAt = block.timestamp;
+
+        if (courierActivePickups[courier] > 0) {
+            courierActivePickups[courier]--;
+        }
+
+        emit PickupCompleted(pickupIdHash, pickupId, courier, block.timestamp);
     }
 
     /**

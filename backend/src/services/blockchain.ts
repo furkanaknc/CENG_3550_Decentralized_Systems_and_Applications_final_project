@@ -5,9 +5,12 @@ const pickupManagerAbi = [
   'function assignRole(address user, uint8 role)',
   'function createPickup(string pickupId, string material, uint256 weightKg) returns (bytes32)',
   'function acceptPickup(string pickupId)',
+  'function acceptPickupWithSig(string pickupId, address courier, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
   'function completePickup(string pickupId)',
+  'function completePickupWithSig(string pickupId, address courier, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
   'function pickups(bytes32 id) view returns (string pickupId,address user,address courier,uint8 status,string material,uint256 weightKg,uint256 createdAt,uint256 assignedAt,uint256 completedAt)',
-  'function userRoles(address user) view returns (uint8)'
+  'function userRoles(address user) view returns (uint8)',
+  'function nonces(address user) view returns (uint256)'
 ];
 
 const greenRewardAbi = [
@@ -54,6 +57,11 @@ export interface OnChainActionResult {
   pickupCompletedTxHash?: string;
   rewardTxHash?: string;
   rewardAmount?: string;
+}
+
+export interface CourierApproval {
+  deadline: number | string | bigint;
+  signature: string;
 }
 
 function readConfig(): Config {
@@ -296,7 +304,8 @@ export function isBlockchainConfigured(): boolean {
 export async function syncPickupAssignment(
   pickup: PickupLike,
   userWallet?: string,
-  courierWallet?: string
+  courierWallet?: string,
+  courierApproval?: CourierApproval
 ): Promise<OnChainActionResult> {
   if (!isBlockchainConfigured()) {
     return { enabled: false };
@@ -338,6 +347,31 @@ export async function syncPickupAssignment(
 
   const manager = ensurePickupManager();
 
+  if (courierApproval && courierApproval.signature) {
+    const signature = ethers.Signature.from(courierApproval.signature);
+    const deadline = normalizeDeadline(courierApproval.deadline);
+
+    try {
+      const tx = await manager.acceptPickupWithSig(
+        pickup.id,
+        courierAddress,
+        deadline,
+        signature.v,
+        signature.r,
+        signature.s
+      );
+      const receipt = await tx.wait();
+      summary.pickupAcceptedTxHash = receipt.hash;
+      return summary;
+    } catch (error: any) {
+      if (isAlreadyKnownError(error)) {
+        summary.pickupAcceptedTxHash = 'pending';
+        return summary;
+      }
+      throw error;
+    }
+  }
+
   try {
     const tx = await manager.acceptPickup(pickup.id);
     const receipt = await tx.wait();
@@ -365,7 +399,8 @@ export async function syncPickupAssignment(
 export async function syncPickupCompletion(
   pickup: PickupLike,
   userWallet?: string,
-  courierWallet?: string
+  courierWallet?: string,
+  courierApproval?: CourierApproval
 ): Promise<OnChainActionResult> {
   if (!isBlockchainConfigured()) {
     return { enabled: false };
@@ -385,8 +420,9 @@ export async function syncPickupCompletion(
     throw new Error(`Pickup ${pickup.id} could not be loaded on chain`);
   }
 
+  const courierAddress = courierWallet ? normalizeAddress(courierWallet) : null;
+
   if (courierWallet) {
-    const courierAddress = normalizeAddress(courierWallet);
     if (!courierAddress) {
       throw new Error(
         'Valid courier wallet address is required for blockchain completion'
@@ -406,22 +442,49 @@ export async function syncPickupCompletion(
   if (statusInfo.status === PICKUP_STATUS.Assigned) {
     const manager = ensurePickupManager();
 
-    try {
-      const tx = await manager.completePickup(pickup.id);
-      const receipt = await tx.wait();
-      summary.pickupCompletedTxHash = receipt.hash;
-    } catch (error: any) {
-      // If transaction is already known (pending in mempool), we can safely proceed
-      if (
-        error.code === 'UNKNOWN_ERROR' &&
-        error.error?.message === 'already known'
-      ) {
-        console.log(
-          `⚠️ Transaction for pickup completion ${pickup.id} is already pending, continuing...`
+    if (courierApproval && courierApproval.signature) {
+      if (!courierAddress) {
+        throw new Error(
+          'Courier wallet address is required to submit completion signature'
         );
-        summary.pickupCompletedTxHash = 'pending';
-      } else {
-        throw error;
+      }
+
+      const signature = ethers.Signature.from(courierApproval.signature);
+      const deadline = normalizeDeadline(courierApproval.deadline);
+
+      try {
+        const tx = await manager.completePickupWithSig(
+          pickup.id,
+          courierAddress,
+          deadline,
+          signature.v,
+          signature.r,
+          signature.s
+        );
+        const receipt = await tx.wait();
+        summary.pickupCompletedTxHash = receipt.hash;
+      } catch (error: any) {
+        if (isAlreadyKnownError(error)) {
+          summary.pickupCompletedTxHash = 'pending';
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      try {
+        const tx = await manager.completePickup(pickup.id);
+        const receipt = await tx.wait();
+        summary.pickupCompletedTxHash = receipt.hash;
+      } catch (error: any) {
+        // If transaction is already known (pending in mempool), we can safely proceed
+        if (isAlreadyKnownError(error)) {
+          console.log(
+            `⚠️ Transaction for pickup completion ${pickup.id} is already pending, continuing...`
+          );
+          summary.pickupCompletedTxHash = 'pending';
+        } else {
+          throw error;
+        }
       }
     }
   }
@@ -431,4 +494,51 @@ export async function syncPickupCompletion(
   summary.rewardAmount = reward.amount;
 
   return summary;
+}
+
+function normalizeDeadline(deadline: number | string | bigint): bigint {
+  if (typeof deadline === 'bigint') {
+    return deadline;
+  }
+  if (typeof deadline === 'number') {
+    if (!Number.isFinite(deadline)) {
+      throw new Error('Invalid courier approval deadline');
+    }
+    return BigInt(Math.floor(deadline));
+  }
+  if (typeof deadline === 'string') {
+    if (!deadline.trim()) {
+      throw new Error('Invalid courier approval deadline');
+    }
+    return BigInt(deadline.trim());
+  }
+  throw new Error('Invalid courier approval deadline type');
+}
+
+function isAlreadyKnownError(error: any): boolean {
+  return (
+    error?.code === 'UNKNOWN_ERROR' &&
+    error?.error?.message === 'already known'
+  );
+}
+
+export async function getCourierNonce(courierAddress: string): Promise<bigint> {
+  if (!isBlockchainConfigured()) {
+    throw new Error('Blockchain is not configured');
+  }
+
+  const manager = ensurePickupManager();
+  const normalizedAddress = normalizeAddress(courierAddress);
+
+  if (!normalizedAddress) {
+    throw new Error('Invalid courier address');
+  }
+
+  try {
+    const nonce = await manager.nonces(normalizedAddress);
+    return BigInt(nonce.toString());
+  } catch (error) {
+    console.error('Failed to get courier nonce:', error);
+    throw new Error('Unable to retrieve courier nonce from blockchain');
+  }
 }

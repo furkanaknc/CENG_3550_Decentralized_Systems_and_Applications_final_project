@@ -276,6 +276,29 @@ class WalletService {
     }
   }
 
+  /// Sign typed data (EIP-712)
+  Future<String?> signTypedData(Map<String, dynamic> typedData) async {
+    if (_web3App == null || _currentSession == null || _currentAddress == null) {
+      return null;
+    }
+
+    try {
+      final signature = await _web3App!.request(
+        topic: _currentSession!,
+        chainId: 'eip155:11155111',
+        request: SessionRequestParams(
+          method: 'eth_signTypedData',
+          params: [_currentAddress, typedData],
+        ),
+      );
+
+      return signature.toString();
+    } catch (e) {
+      print('Failed to sign typed data: $e');
+      return null;
+    }
+  }
+
   // Event handlers
   void _onSessionEvent(SessionEvent? event) {
     print('Session event: ${event?.name}');

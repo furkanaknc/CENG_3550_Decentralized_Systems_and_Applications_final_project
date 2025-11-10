@@ -63,14 +63,18 @@ export interface PickupManagerInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "acceptPickup"
+      | "acceptPickupWithSig"
       | "assignRole"
       | "completePickup"
+      | "completePickupWithSig"
       | "courierActivePickups"
       | "createPickup"
+      | "eip712Domain"
       | "getPickup"
       | "getPickupByIndex"
       | "getPickupCount"
       | "getRole"
+      | "nonces"
       | "owner"
       | "pickupIds"
       | "pickups"
@@ -81,6 +85,7 @@ export interface PickupManagerInterface extends Interface {
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "EIP712DomainChanged"
       | "OwnershipTransferred"
       | "PickupAssigned"
       | "PickupCompleted"
@@ -93,6 +98,17 @@ export interface PickupManagerInterface extends Interface {
     values: [string]
   ): string;
   encodeFunctionData(
+    functionFragment: "acceptPickupWithSig",
+    values: [
+      string,
+      AddressLike,
+      BigNumberish,
+      BigNumberish,
+      BytesLike,
+      BytesLike
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "assignRole",
     values: [AddressLike, BigNumberish]
   ): string;
@@ -101,12 +117,27 @@ export interface PickupManagerInterface extends Interface {
     values: [string]
   ): string;
   encodeFunctionData(
+    functionFragment: "completePickupWithSig",
+    values: [
+      string,
+      AddressLike,
+      BigNumberish,
+      BigNumberish,
+      BytesLike,
+      BytesLike
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "courierActivePickups",
     values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "createPickup",
     values: [string, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "eip712Domain",
+    values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "getPickup", values: [string]): string;
   encodeFunctionData(
@@ -121,6 +152,7 @@ export interface PickupManagerInterface extends Interface {
     functionFragment: "getRole",
     values: [AddressLike]
   ): string;
+  encodeFunctionData(functionFragment: "nonces", values: [AddressLike]): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "pickupIds",
@@ -144,9 +176,17 @@ export interface PickupManagerInterface extends Interface {
     functionFragment: "acceptPickup",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "acceptPickupWithSig",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "assignRole", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "completePickup",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "completePickupWithSig",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -155,6 +195,10 @@ export interface PickupManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "createPickup",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "eip712Domain",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getPickup", data: BytesLike): Result;
@@ -167,6 +211,7 @@ export interface PickupManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getRole", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "nonces", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "pickupIds", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "pickups", data: BytesLike): Result;
@@ -179,6 +224,16 @@ export interface PickupManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "userRoles", data: BytesLike): Result;
+}
+
+export namespace EIP712DomainChangedEvent {
+  export type InputTuple = [];
+  export type OutputTuple = [];
+  export interface OutputObject {}
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace OwnershipTransferredEvent {
@@ -330,6 +385,19 @@ export interface PickupManager extends BaseContract {
 
   acceptPickup: TypedContractMethod<[pickupId: string], [void], "nonpayable">;
 
+  acceptPickupWithSig: TypedContractMethod<
+    [
+      pickupId: string,
+      courier: AddressLike,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
+
   assignRole: TypedContractMethod<
     [user: AddressLike, role: BigNumberish],
     [void],
@@ -337,6 +405,19 @@ export interface PickupManager extends BaseContract {
   >;
 
   completePickup: TypedContractMethod<[pickupId: string], [void], "nonpayable">;
+
+  completePickupWithSig: TypedContractMethod<
+    [
+      pickupId: string,
+      courier: AddressLike,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
 
   courierActivePickups: TypedContractMethod<
     [arg0: AddressLike],
@@ -348,6 +429,22 @@ export interface PickupManager extends BaseContract {
     [pickupId: string, material: string, weightKg: BigNumberish],
     [string],
     "nonpayable"
+  >;
+
+  eip712Domain: TypedContractMethod<
+    [],
+    [
+      [string, string, string, bigint, string, string, bigint[]] & {
+        fields: string;
+        name: string;
+        version: string;
+        chainId: bigint;
+        verifyingContract: string;
+        salt: string;
+        extensions: bigint[];
+      }
+    ],
+    "view"
   >;
 
   getPickup: TypedContractMethod<
@@ -365,6 +462,8 @@ export interface PickupManager extends BaseContract {
   getPickupCount: TypedContractMethod<[], [bigint], "view">;
 
   getRole: TypedContractMethod<[user: AddressLike], [bigint], "view">;
+
+  nonces: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   owner: TypedContractMethod<[], [string], "view">;
 
@@ -416,6 +515,20 @@ export interface PickupManager extends BaseContract {
     nameOrSignature: "acceptPickup"
   ): TypedContractMethod<[pickupId: string], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "acceptPickupWithSig"
+  ): TypedContractMethod<
+    [
+      pickupId: string,
+      courier: AddressLike,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "assignRole"
   ): TypedContractMethod<
     [user: AddressLike, role: BigNumberish],
@@ -426,6 +539,20 @@ export interface PickupManager extends BaseContract {
     nameOrSignature: "completePickup"
   ): TypedContractMethod<[pickupId: string], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "completePickupWithSig"
+  ): TypedContractMethod<
+    [
+      pickupId: string,
+      courier: AddressLike,
+      deadline: BigNumberish,
+      v: BigNumberish,
+      r: BytesLike,
+      s: BytesLike
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "courierActivePickups"
   ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
   getFunction(
@@ -434,6 +561,23 @@ export interface PickupManager extends BaseContract {
     [pickupId: string, material: string, weightKg: BigNumberish],
     [string],
     "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "eip712Domain"
+  ): TypedContractMethod<
+    [],
+    [
+      [string, string, string, bigint, string, string, bigint[]] & {
+        fields: string;
+        name: string;
+        version: string;
+        chainId: bigint;
+        verifyingContract: string;
+        salt: string;
+        extensions: bigint[];
+      }
+    ],
+    "view"
   >;
   getFunction(
     nameOrSignature: "getPickup"
@@ -455,6 +599,9 @@ export interface PickupManager extends BaseContract {
   getFunction(
     nameOrSignature: "getRole"
   ): TypedContractMethod<[user: AddressLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "nonces"
+  ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
   getFunction(
     nameOrSignature: "owner"
   ): TypedContractMethod<[], [string], "view">;
@@ -501,6 +648,13 @@ export interface PickupManager extends BaseContract {
   ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   getEvent(
+    key: "EIP712DomainChanged"
+  ): TypedContractEvent<
+    EIP712DomainChangedEvent.InputTuple,
+    EIP712DomainChangedEvent.OutputTuple,
+    EIP712DomainChangedEvent.OutputObject
+  >;
+  getEvent(
     key: "OwnershipTransferred"
   ): TypedContractEvent<
     OwnershipTransferredEvent.InputTuple,
@@ -537,6 +691,17 @@ export interface PickupManager extends BaseContract {
   >;
 
   filters: {
+    "EIP712DomainChanged()": TypedContractEvent<
+      EIP712DomainChangedEvent.InputTuple,
+      EIP712DomainChangedEvent.OutputTuple,
+      EIP712DomainChangedEvent.OutputObject
+    >;
+    EIP712DomainChanged: TypedContractEvent<
+      EIP712DomainChangedEvent.InputTuple,
+      EIP712DomainChangedEvent.OutputTuple,
+      EIP712DomainChangedEvent.OutputObject
+    >;
+
     "OwnershipTransferred(address,address)": TypedContractEvent<
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
