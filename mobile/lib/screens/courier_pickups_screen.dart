@@ -108,34 +108,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   }
 
   Future<void> _completePickup(String pickupId) async {
-    // Onay dialogu göster
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Talebi Tamamla'),
-        content: const Text(
-          'Bu talebi tamamlamak istediğinize emin misiniz? '
-          'Malzeme toplandı olarak işaretlenecek.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-            ),
-            child: const Text('Tamamla'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
     try {
+      // Cüzdanda approval zaten gelecek, ekstra onay dialoguna gerek yok
       await _api.completePickup(pickupId);
 
       if (mounted) {

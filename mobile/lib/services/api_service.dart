@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'wallet_service.dart';
 
 class RecyclingPoint {
   final String id;
@@ -90,6 +91,7 @@ class ApiService {
   factory ApiService() => _singleton;
 
   final AuthService _auth = AuthService();
+  final WalletService _wallet = WalletService();
 
   static const double _defaultLatitude = 41.0082;
   static const double _defaultLongitude = 28.9784;
@@ -262,18 +264,39 @@ class ApiService {
 
   /// Kurye için talep kabul etme
   Future<PickupSummary> acceptPickup(String pickupId) async {
+    // Try to create signature if wallet is connected
+    Map<String, dynamic>? courierApproval;
+    
+    final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
+    
+    if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
+      try {
+        courierApproval = await createAcceptPickupSignature(pickupId, pickupManagerAddress);
+      } catch (e) {
+        print('Failed to create signature, continuing without it: $e');
+        // If blockchain is not configured on backend, continue without signature
+      }
+    }
+
     final headers = {
       'Content-Type': 'application/json',
       ..._auth.getAuthHeaders(),
     };
 
+    final body = courierApproval != null 
+        ? jsonEncode({'courierApproval': courierApproval})
+        : '{}';
+
     final response = await _client.post(
       _uri('/api/couriers/pickups/$pickupId/accept'),
       headers: headers,
+      body: body,
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Talep kabul edilemedi', response.statusCode);
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = payload['message'] as String? ?? 'Talep kabul edilemedi';
+      throw ApiException(message, response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -283,23 +306,194 @@ class ApiService {
 
   /// Kurye için talep tamamlama
   Future<PickupSummary> completePickup(String pickupId) async {
+    // Try to create signature if wallet is connected
+    Map<String, dynamic>? courierApproval;
+    
+    final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
+    
+    if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
+      try {
+        courierApproval = await createCompletePickupSignature(pickupId, pickupManagerAddress);
+      } catch (e) {
+        print('Failed to create signature, continuing without it: $e');
+        // If blockchain is not configured on backend, continue without signature
+      }
+    }
+
     final headers = {
       'Content-Type': 'application/json',
       ..._auth.getAuthHeaders(),
     };
 
+    final body = courierApproval != null 
+        ? jsonEncode({'courierApproval': courierApproval})
+        : '{}';
+
     final response = await _client.post(
       _uri('/api/couriers/pickups/$pickupId/complete'),
       headers: headers,
+      body: body,
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Talep tamamlanamadı', response.statusCode);
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = payload['message'] as String? ?? 'Talep tamamlanamadı';
+      throw ApiException(message, response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final pickup = payload['pickup'] as Map<String, dynamic>;
     return _parsePickupSummary(pickup)!;
+  }
+
+  /// Get courier nonce from backend for signing
+  Future<Map<String, dynamic>> getCourierNonce() async {
+    final headers = _auth.getAuthHeaders();
+
+    final response = await _client.get(
+      _uri('/api/couriers/nonce'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Nonce alınamadı', response.statusCode);
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Create courier approval signature for accepting pickup
+  Future<Map<String, dynamic>?> createAcceptPickupSignature(
+      String pickupId, String pickupManagerAddress) async {
+    if (!_wallet.isConnected) {
+      return null;
+    }
+
+    try {
+      final nonceData = await getCourierNonce();
+      final blockchainEnabled = nonceData['blockchainEnabled'] as bool? ?? false;
+
+      if (!blockchainEnabled) {
+        return null; // Blockchain not configured, no signature needed
+      }
+
+      final nonce = int.parse(nonceData['nonce'].toString());
+      final courierAddress = nonceData['address'] as String;
+
+      // Deadline: 1 hour from now
+      final deadline = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600;
+
+      final typedData = {
+        'types': {
+          'EIP712Domain': [
+            {'name': 'name', 'type': 'string'},
+            {'name': 'version', 'type': 'string'},
+            {'name': 'chainId', 'type': 'uint256'},
+            {'name': 'verifyingContract', 'type': 'address'},
+          ],
+          'AcceptPickup': [
+            {'name': 'pickupId', 'type': 'string'},
+            {'name': 'courier', 'type': 'address'},
+            {'name': 'nonce', 'type': 'uint256'},
+            {'name': 'deadline', 'type': 'uint256'},
+          ],
+        },
+        'primaryType': 'AcceptPickup',
+        'domain': {
+          'name': 'PickupManager',
+          'version': '1',
+          'chainId': 11155111, // Sepolia
+          'verifyingContract': pickupManagerAddress,
+        },
+        'message': {
+          'pickupId': pickupId,
+          'courier': courierAddress,
+          'nonce': nonce,
+          'deadline': deadline,
+        },
+      };
+
+      final signature = await _wallet.signTypedData(typedData);
+
+      if (signature == null) {
+        throw ApiException('İmza oluşturulamadı');
+      }
+
+      return {
+        'signature': signature,
+        'deadline': deadline,
+      };
+    } catch (e) {
+      print('Failed to create accept pickup signature: $e');
+      rethrow;
+    }
+  }
+
+  /// Create courier approval signature for completing pickup
+  Future<Map<String, dynamic>?> createCompletePickupSignature(
+      String pickupId, String pickupManagerAddress) async {
+    if (!_wallet.isConnected) {
+      return null;
+    }
+
+    try {
+      final nonceData = await getCourierNonce();
+      final blockchainEnabled = nonceData['blockchainEnabled'] as bool? ?? false;
+
+      if (!blockchainEnabled) {
+        return null; // Blockchain not configured, no signature needed
+      }
+
+      final nonce = int.parse(nonceData['nonce'].toString());
+      final courierAddress = nonceData['address'] as String;
+
+      // Deadline: 1 hour from now
+      final deadline = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600;
+
+      final typedData = {
+        'types': {
+          'EIP712Domain': [
+            {'name': 'name', 'type': 'string'},
+            {'name': 'version', 'type': 'string'},
+            {'name': 'chainId', 'type': 'uint256'},
+            {'name': 'verifyingContract', 'type': 'address'},
+          ],
+          'CompletePickup': [
+            {'name': 'pickupId', 'type': 'string'},
+            {'name': 'courier', 'type': 'address'},
+            {'name': 'nonce', 'type': 'uint256'},
+            {'name': 'deadline', 'type': 'uint256'},
+          ],
+        },
+        'primaryType': 'CompletePickup',
+        'domain': {
+          'name': 'PickupManager',
+          'version': '1',
+          'chainId': 11155111, // Sepolia
+          'verifyingContract': pickupManagerAddress,
+        },
+        'message': {
+          'pickupId': pickupId,
+          'courier': courierAddress,
+          'nonce': nonce,
+          'deadline': deadline,
+        },
+      };
+
+      final signature = await _wallet.signTypedData(typedData);
+
+      if (signature == null) {
+        throw ApiException('İmza oluşturulamadı');
+      }
+
+      return {
+        'signature': signature,
+        'deadline': deadline,
+      };
+    } catch (e) {
+      print('Failed to create complete pickup signature: $e');
+      rethrow;
+    }
   }
 
   PickupSummary? _parsePickupSummary(dynamic raw) {
