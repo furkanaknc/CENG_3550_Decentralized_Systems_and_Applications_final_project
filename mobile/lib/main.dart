@@ -5,6 +5,7 @@ import 'screens/map_screen.dart';
 import 'screens/pickup_request_screen.dart';
 import 'screens/rewards_screen.dart';
 import 'screens/courier_pickups_screen.dart';
+import 'screens/admin_screen.dart';
 import 'services/auth_service.dart';
 
 Future<void> main() async {
@@ -54,6 +55,11 @@ class _HomeShellState extends State<HomeShell> {
         MapScreen(),
       ];
 
+  List<Widget> get _adminPages => const [
+        AdminScreen(),
+        MapScreen(),
+      ];
+
   List<NavigationDestination> get _userDestinations => const [
         NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
         NavigationDestination(icon: Icon(Icons.recycling), label: 'Teslim'),
@@ -62,6 +68,11 @@ class _HomeShellState extends State<HomeShell> {
 
   List<NavigationDestination> get _courierDestinations => const [
         NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Talepler'),
+        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
+      ];
+
+  List<NavigationDestination> get _adminDestinations => const [
+        NavigationDestination(icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
         NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
       ];
 
@@ -111,9 +122,22 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
+    final isAdmin = user?.isAdmin ?? false;
     final isCourier = user?.isCourier ?? false;
-    final pages = isCourier ? _courierPages : _userPages;
-    final destinations = isCourier ? _courierDestinations : _userDestinations;
+    
+    final List<Widget> pages;
+    final List<NavigationDestination> destinations;
+    
+    if (isAdmin) {
+      pages = _adminPages;
+      destinations = _adminDestinations;
+    } else if (isCourier) {
+      pages = _courierPages;
+      destinations = _courierDestinations;
+    } else {
+      pages = _userPages;
+      destinations = _userDestinations;
+    }
 
     // Reset index if it's out of bounds
     if (_index >= pages.length) {
@@ -123,7 +147,7 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Green Cycle'),
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: isAdmin ? Colors.purple.shade700 : Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
           // Role badge
@@ -158,3 +182,4 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 }
+

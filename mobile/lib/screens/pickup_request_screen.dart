@@ -162,7 +162,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: _material,
+                        initialValue: _material,
                         decoration: const InputDecoration(labelText: 'Atık türü'),
                         items: const [
                           DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
@@ -308,7 +308,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
           const SizedBox(height: 8),
           Card(
             margin: EdgeInsets.zero,
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
             child: ListTile(
               leading: const Icon(Icons.place),
               title: const Text('Seçilen konum'),

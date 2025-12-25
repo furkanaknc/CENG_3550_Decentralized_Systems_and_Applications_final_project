@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'pickup_request_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -15,6 +19,8 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+  final AuthService _auth = AuthService();
+  final http.Client _client = http.Client();
   bool _loading = true;
   List<RecyclingPoint> _points = const [];
   RecyclingPoint? _selectedPoint;
@@ -23,6 +29,13 @@ class _MapScreenState extends State<MapScreen> {
   static const double _maxZoom = 18;
   static const double _zoomStep = 1.2;
   bool _showWebHint = kIsWeb;
+
+  bool get _isAdmin => _auth.currentUser?.isAdmin ?? false;
+
+  String get _baseUrl {
+    final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:4000';
+    return apiUrl.replaceAll(RegExp(r'/+$'), '');
+  }
 
   @override
   void initState() {
@@ -54,7 +67,8 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
       setState(() {
-        _errorMessage = 'Geri dönüşüm noktaları yüklenemedi. Lütfen tekrar deneyin.';
+        _errorMessage =
+            'Geri dönüşüm noktaları yüklenemedi. Lütfen tekrar deneyin.';
         _loading = false;
       });
     }
@@ -95,7 +109,8 @@ class _MapScreenState extends State<MapScreen> {
 
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
-    final targetZoom = (camera.zoom + delta).clamp(_minZoom, _maxZoom).toDouble();
+    final targetZoom =
+        (camera.zoom + delta).clamp(_minZoom, _maxZoom).toDouble();
     _mapController.move(camera.center, targetZoom);
     if (_showWebHint) {
       setState(() => _showWebHint = false);
@@ -105,6 +120,144 @@ class _MapScreenState extends State<MapScreen> {
   void _zoomIn() => _zoomBy(_zoomStep);
 
   void _zoomOut() => _zoomBy(-_zoomStep);
+
+  void _showAddLocationDialog(LatLng point) {
+    final nameController = TextEditingController();
+    final materials = ['plastic', 'glass', 'paper', 'metal', 'electronics'];
+    final selectedMaterials = <String>{'plastic', 'glass', 'paper', 'metal'};
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Yeni Geri Dönüşüm Noktası'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '📍 Konum: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nokta Adı',
+                    hintText: 'Örn: Kadıköy Geri Dönüşüm Merkezi',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Kabul Edilen Materyaller:'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: materials.map((m) {
+                    final selected = selectedMaterials.contains(m);
+                    return FilterChip(
+                      label: Text(m),
+                      selected: selected,
+                      onSelected: (v) {
+                        setDialogState(() {
+                          if (v) {
+                            selectedMaterials.add(m);
+                          } else {
+                            selectedMaterials.remove(m);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Lütfen bir isim girin')),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+                _createLocation(
+                  nameController.text.trim(),
+                  point,
+                  selectedMaterials.toList(),
+                );
+              },
+              child: const Text('Oluştur'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createLocation(
+      String name, LatLng point, List<String> materials) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Nokta oluşturuluyor...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final response = await _client.post(
+        Uri.parse('$_baseUrl/api/admin/locations'),
+        headers: {
+          ..._auth.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'name': name,
+          'latitude': point.latitude,
+          'longitude': point.longitude,
+          'acceptedMaterials': materials,
+        }),
+      );
+
+      Navigator.pop(context); // Close loading
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ "$name" oluşturuldu!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadPoints(); // Refresh map
+      } else {
+        throw Exception('Sunucu hatası: ${response.statusCode}');
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Oluşturulamadı: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +333,9 @@ class _MapScreenState extends State<MapScreen> {
                 _showWebHint = false;
               });
             },
+            onLongPress: _isAdmin
+                ? (tapPosition, point) => _showAddLocationDialog(point)
+                : null,
           ),
           children: [
             TileLayer(
@@ -208,7 +364,8 @@ class _MapScreenState extends State<MapScreen> {
                       final selected = point.id == _selectedPoint?.id;
                       return ChoiceChip(
                         selected: selected,
-                        label: Text(point.name, overflow: TextOverflow.ellipsis),
+                        label:
+                            Text(point.name, overflow: TextOverflow.ellipsis),
                         avatar: const Icon(Icons.recycling, size: 18),
                         onSelected: (_) => _focusOnPoint(point),
                         selectedColor: Theme.of(context).colorScheme.primary,
@@ -233,7 +390,8 @@ class _MapScreenState extends State<MapScreen> {
             top: 16,
             right: 16,
             child: SafeArea(
-              child: _WebHelpCard(onClose: () => setState(() => _showWebHint = false)),
+              child: _WebHelpCard(
+                  onClose: () => setState(() => _showWebHint = false)),
             ),
           ),
         Positioned(
@@ -307,7 +465,19 @@ class _MapScreenState extends State<MapScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(point.name, style: textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(point.name, style: textTheme.titleMedium),
+                ),
+                if (_isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Noktayı Sil',
+                    onPressed: () => _confirmDeleteLocation(point),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -337,6 +507,79 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
+
+  void _confirmDeleteLocation(RecyclingPoint point) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning, color: Colors.orange, size: 48),
+        title: const Text('Noktayı Sil'),
+        content:
+            Text('"${point.name}" noktasını silmek istediğinize emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteLocation(point);
+            },
+            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteLocation(RecyclingPoint point) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Siliniyor...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final response = await _client.delete(
+        Uri.parse('$_baseUrl/api/admin/locations/${point.id}'),
+        headers: _auth.getAuthHeaders(),
+      );
+
+      Navigator.pop(context);
+
+      if (response.statusCode == 200) {
+        setState(() => _selectedPoint = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ "${point.name}" silindi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadPoints();
+      } else {
+        throw Exception('Sunucu hatası: ${response.statusCode}');
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Silinemedi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
 
 class _WebHelpCard extends StatelessWidget {
@@ -355,7 +598,8 @@ class _WebHelpCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+            Icon(Icons.info_outline,
+                color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
