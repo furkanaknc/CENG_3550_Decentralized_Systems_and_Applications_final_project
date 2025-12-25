@@ -1,9 +1,9 @@
-import { CarbonReport, PickupRequest } from '../models';
+import { CarbonReport, PickupRequest } from "../models";
 
 export function estimateCarbonSavings(pickup: PickupRequest): CarbonReport {
-  const baselineEmissionPerKm = 0.21; // kg CO2 per km for car
-  const optimizedEmissionPerKm = 0.08; // kg CO2 per km for electric courier bike
-  const estimatedDistanceKm = 3; // placeholder average
+  const baselineEmissionPerKm = 0.21;
+  const optimizedEmissionPerKm = 0.08;
+  const estimatedDistanceKm = 3;
 
   const baseline = baselineEmissionPerKm * estimatedDistanceKm;
   const optimized = optimizedEmissionPerKm * estimatedDistanceKm;

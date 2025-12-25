@@ -1,5 +1,5 @@
-import { query } from '../db/client';
-import { RecyclingLocation } from '../models';
+import { query } from "../db/client";
+import { RecyclingLocation } from "../models";
 
 type RecyclingLocationRow = {
   id: string;
@@ -13,12 +13,18 @@ function mapLocation(row: RecyclingLocationRow): RecyclingLocation {
   return {
     id: row.id,
     name: row.name,
-    coordinates: { latitude: Number(row.latitude), longitude: Number(row.longitude) },
-    acceptedMaterials: row.accepted_materials as RecyclingLocation['acceptedMaterials']
+    coordinates: {
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+    },
+    acceptedMaterials:
+      row.accepted_materials as RecyclingLocation["acceptedMaterials"],
   };
 }
 
-export async function upsertRecyclingLocation(location: RecyclingLocation): Promise<RecyclingLocation> {
+export async function upsertRecyclingLocation(
+  location: RecyclingLocation
+): Promise<RecyclingLocation> {
   const { id, name, coordinates, acceptedMaterials } = location;
 
   await query(
@@ -35,9 +41,11 @@ export async function upsertRecyclingLocation(location: RecyclingLocation): Prom
   return location;
 }
 
-export async function findLocationById(id: string): Promise<RecyclingLocation | null> {
+export async function findLocationById(
+  id: string
+): Promise<RecyclingLocation | null> {
   const { rows } = await query<RecyclingLocationRow>(
-    'SELECT * FROM recycling_locations WHERE id = $1 LIMIT 1',
+    "SELECT * FROM recycling_locations WHERE id = $1 LIMIT 1",
     [id]
   );
 
@@ -53,7 +61,6 @@ export async function findNearbyLocations(
   longitude: number,
   radiusKm: number
 ): Promise<RecyclingLocation[]> {
-  // Haversine formula kullanarak yakındaki konumları bul
   const { rows } = await query<RecyclingLocationRow>(
     `SELECT *,
       (6371 * acos(
@@ -73,4 +80,19 @@ export async function findNearbyLocations(
   );
 
   return rows.map(mapLocation);
+}
+
+export async function listAllLocations(): Promise<RecyclingLocation[]> {
+  const { rows } = await query<RecyclingLocationRow>(
+    "SELECT * FROM recycling_locations ORDER BY name"
+  );
+  return rows.map(mapLocation);
+}
+
+export async function deleteLocation(id: string): Promise<boolean> {
+  const { rowCount } = await query(
+    "DELETE FROM recycling_locations WHERE id = $1",
+    [id]
+  );
+  return (rowCount ?? 0) > 0;
 }

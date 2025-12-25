@@ -1,7 +1,7 @@
-import { query } from '../db/client';
-import { v4 as uuid } from 'uuid';
+import { query } from "../db/client";
+import { v4 as uuid } from "uuid";
 
-type UserRole = 'user' | 'courier' | 'admin';
+type UserRole = "user" | "courier" | "admin";
 
 export interface User {
   id: string;
@@ -34,16 +34,16 @@ function mapUser(row: UserRow): User {
     role: row.role,
     greenPoints: row.green_points,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
 function buildPlaceholderEmail(userId: string): string {
-  const sanitized = userId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+  const sanitized = userId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
   const suffix =
     sanitized ||
     uuid()
-      .replace(/[^a-zA-Z0-9]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, "")
       .slice(0, 12);
   return `user+${suffix}@example.com`;
 }
@@ -52,7 +52,7 @@ export async function getUserByWallet(
   walletAddress: string
 ): Promise<User | null> {
   const { rows } = await query<UserRow>(
-    'SELECT * FROM users WHERE wallet_address = $1 LIMIT 1',
+    "SELECT * FROM users WHERE wallet_address = $1 LIMIT 1",
     [walletAddress.toLowerCase()]
   );
 
@@ -65,7 +65,7 @@ export async function getUserByWallet(
 
 export async function getUserById(userId: string): Promise<User | null> {
   const { rows } = await query<UserRow>(
-    'SELECT * FROM users WHERE id = $1 LIMIT 1',
+    "SELECT * FROM users WHERE id = $1 LIMIT 1",
     [userId]
   );
 
@@ -83,7 +83,7 @@ export async function createOrUpdateUser(data: {
 }): Promise<User> {
   const walletLower = data.walletAddress.toLowerCase();
   const name = data.name || `User ${walletLower.substring(0, 8)}`;
-  const role = data.role || 'user';
+  const role = data.role || "user";
   const id = `user-${uuid()}`;
   const email = buildPlaceholderEmail(id);
 
@@ -100,8 +100,7 @@ export async function createOrUpdateUser(data: {
 
   const user = mapUser(rows[0]);
 
-  // Eğer rol courier ise ve courier kaydı yoksa otomatik oluştur
-  if (user.role === 'courier') {
+  if (user.role === "courier") {
     await ensureCourierExists(user.id, user.name);
   }
 
@@ -112,7 +111,7 @@ async function ensureCourierExists(
   userId: string,
   userName: string
 ): Promise<void> {
-  const courierId = 'courier-' + userId.substring(5); // 'user-' kısmını çıkar
+  const courierId = "courier-" + userId.substring(5);
 
   await query(
     `INSERT INTO couriers (id, name, active, latitude, longitude, user_id)
@@ -120,13 +119,13 @@ async function ensureCourierExists(
      ON CONFLICT (id) DO UPDATE SET
        user_id = EXCLUDED.user_id,
        name = EXCLUDED.name`,
-    [courierId, userName + ' (Courier)', userId]
+    [courierId, userName + " (Courier)", userId]
   );
 }
 
 export async function ensureUserExists(userId: string): Promise<void> {
   const placeholderEmail = buildPlaceholderEmail(userId);
-  const placeholderName = `Kullanıcı ${userId.substring(0, 8) || 'Anonim'}`;
+  const placeholderName = `Kullanıcı ${userId.substring(0, 8) || "Anonim"}`;
 
   await query(
     `INSERT INTO users (id, name, email)
@@ -142,16 +141,55 @@ export async function addGreenPoints(
 ): Promise<void> {
   await ensureUserExists(userId);
   await query(
-    'UPDATE users SET green_points = green_points + $1 WHERE id = $2',
+    "UPDATE users SET green_points = green_points + $1 WHERE id = $2",
     [points, userId]
   );
 }
 
 export async function listUsersByRole(role: UserRole): Promise<User[]> {
   const { rows } = await query<UserRow>(
-    'SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC',
+    "SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC",
     [role]
   );
 
   return rows.map(mapUser);
+}
+
+export async function listAllUsers(): Promise<User[]> {
+  const { rows } = await query<UserRow>(
+    "SELECT * FROM users ORDER BY created_at DESC"
+  );
+
+  return rows.map(mapUser);
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: UserRole
+): Promise<User | null> {
+  const { rows } = await query<UserRow>(
+    `UPDATE users 
+     SET role = $2, updated_at = NOW() 
+     WHERE id = $1 
+     RETURNING *`,
+    [userId, role]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const user = mapUser(rows[0]);
+
+  if (role === "courier") {
+    await ensureCourierExists(user.id, user.name);
+  }
+
+  return user;
+}
+
+export async function deleteUser(userId: string): Promise<boolean> {
+  const { rowCount } = await query("DELETE FROM users WHERE id = $1", [userId]);
+
+  return (rowCount ?? 0) > 0;
 }
