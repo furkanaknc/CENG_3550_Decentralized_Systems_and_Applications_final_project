@@ -12,10 +12,8 @@ import { authenticateWallet, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-// Public endpoints
 router.get('/', listCouriers);
 
-// Courier-only endpoints
 router.get(
   '/nonce',
   authenticateWallet,

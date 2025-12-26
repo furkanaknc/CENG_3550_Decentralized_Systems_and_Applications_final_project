@@ -77,7 +77,6 @@ class ApiException implements Exception {
   }
 }
 
-/// API istemcisi backend ile haberleşmeyi üstlenir.
 class ApiService {
   ApiService._internal() {
     _baseUrl =
@@ -97,7 +96,6 @@ class ApiService {
   final http.Client _client = http.Client();
   late String _baseUrl;
 
-  /// Manuel olarak backend adresini değiştirmek isteyenler için yardımcı metot.
   void configure({String? baseUrl}) {
     if (baseUrl == null || baseUrl.isEmpty) {
       return;
@@ -124,10 +122,8 @@ class ApiService {
     late final http.Response response;
 
     if (showAll) {
-      // Admin mode: get all locations
       response = await _client.get(_uri('/api/maps/all'));
     } else {
-      // User mode: get nearby locations
       final lat = latitude ?? _defaultLatitude;
       final lon = longitude ?? _defaultLongitude;
       response = await _client.get(
@@ -228,7 +224,6 @@ class ApiService {
     return null;
   }
 
-  /// Kurye için bekleyen talepleri getir
   Future<List<PickupSummary>> getPendingPickups() async {
     final headers = _auth.getAuthHeaders();
 
@@ -247,7 +242,6 @@ class ApiService {
     return pickups.map(_parsePickupSummary).whereType<PickupSummary>().toList();
   }
 
-  /// Kurye için kabul edilmiş (assigned) talepleri getir
   Future<List<PickupSummary>> getMyPickups() async {
     final headers = _auth.getAuthHeaders();
 
@@ -267,9 +261,7 @@ class ApiService {
     return pickups.map(_parsePickupSummary).whereType<PickupSummary>().toList();
   }
 
-  /// Kurye için talep kabul etme
   Future<PickupSummary> acceptPickup(String pickupId) async {
-    // Try to create signature if wallet is connected
     Map<String, dynamic>? courierApproval;
 
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
@@ -280,7 +272,6 @@ class ApiService {
             await createAcceptPickupSignature(pickupId, pickupManagerAddress);
       } catch (e) {
         print('Failed to create signature, continuing without it: $e');
-        // If blockchain is not configured on backend, continue without signature
       }
     }
 
@@ -310,9 +301,7 @@ class ApiService {
     return _parsePickupSummary(pickup)!;
   }
 
-  /// Kurye için talep tamamlama
   Future<PickupSummary> completePickup(String pickupId) async {
-    // Try to create signature if wallet is connected
     Map<String, dynamic>? courierApproval;
 
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
@@ -323,7 +312,6 @@ class ApiService {
             await createCompletePickupSignature(pickupId, pickupManagerAddress);
       } catch (e) {
         print('Failed to create signature, continuing without it: $e');
-        // If blockchain is not configured on backend, continue without signature
       }
     }
 
@@ -353,7 +341,6 @@ class ApiService {
     return _parsePickupSummary(pickup)!;
   }
 
-  /// Get courier nonce from backend for signing
   Future<Map<String, dynamic>> getCourierNonce() async {
     final headers = _auth.getAuthHeaders();
 
@@ -369,7 +356,6 @@ class ApiService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  /// Create courier approval signature for accepting pickup
   Future<Map<String, dynamic>?> createAcceptPickupSignature(
       String pickupId, String pickupManagerAddress) async {
     if (!_wallet.isConnected) {
@@ -382,13 +368,12 @@ class ApiService {
           nonceData['blockchainEnabled'] as bool? ?? false;
 
       if (!blockchainEnabled) {
-        return null; // Blockchain not configured, no signature needed
+        return null;
       }
 
       final nonce = int.parse(nonceData['nonce'].toString());
       final courierAddress = nonceData['address'] as String;
 
-      // Deadline: 1 hour from now
       final deadline = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600;
 
       final typedData = {
@@ -410,7 +395,7 @@ class ApiService {
         'domain': {
           'name': 'PickupManager',
           'version': '1',
-          'chainId': 11155111, // Sepolia
+          'chainId': 11155111,
           'verifyingContract': pickupManagerAddress,
         },
         'message': {
@@ -437,7 +422,6 @@ class ApiService {
     }
   }
 
-  /// Create courier approval signature for completing pickup
   Future<Map<String, dynamic>?> createCompletePickupSignature(
       String pickupId, String pickupManagerAddress) async {
     if (!_wallet.isConnected) {
@@ -450,13 +434,12 @@ class ApiService {
           nonceData['blockchainEnabled'] as bool? ?? false;
 
       if (!blockchainEnabled) {
-        return null; // Blockchain not configured, no signature needed
+        return null;
       }
 
       final nonce = int.parse(nonceData['nonce'].toString());
       final courierAddress = nonceData['address'] as String;
 
-      // Deadline: 1 hour from now
       final deadline = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3600;
 
       final typedData = {
@@ -478,7 +461,7 @@ class ApiService {
         'domain': {
           'name': 'PickupManager',
           'version': '1',
-          'chainId': 11155111, // Sepolia
+          'chainId': 11155111,
           'verifyingContract': pickupManagerAddress,
         },
         'message': {

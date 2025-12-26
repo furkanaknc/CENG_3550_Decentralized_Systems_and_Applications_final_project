@@ -72,14 +72,12 @@ export async function getMyPickups(req: AuthenticatedRequest, res: Response) {
   }
 
   try {
-    // Get courier ID from user
     const courier = await getCourierByUserId(req.user.id);
 
     if (!courier) {
       return res.status(404).json({ message: 'Courier profile not found' });
     }
 
-    // Get all pickups assigned to this courier
     const { query } = await import('../db/client');
     const { rows } = await query(
       `SELECT 

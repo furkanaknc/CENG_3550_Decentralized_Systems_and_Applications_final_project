@@ -27,21 +27,18 @@ class WalletConnectModal extends StatelessWidget {
 
   Future<void> _openInWallet() async {
     try {
-      // MetaMask deep link
       final metamaskUri = Uri.parse('metamask://wc?uri=${Uri.encodeComponent(uri)}');
       if (await canLaunchUrl(metamaskUri)) {
         await launchUrl(metamaskUri, mode: LaunchMode.externalApplication);
         return;
       }
 
-      // Trust Wallet deep link
       final trustUri = Uri.parse('trust://wc?uri=${Uri.encodeComponent(uri)}');
       if (await canLaunchUrl(trustUri)) {
         await launchUrl(trustUri, mode: LaunchMode.externalApplication);
         return;
       }
 
-      // Generic WalletConnect deep link
       final wcUri = Uri.parse('wc://wc?uri=${Uri.encodeComponent(uri)}');
       if (await canLaunchUrl(wcUri)) {
         await launchUrl(wcUri, mode: LaunchMode.externalApplication);
@@ -63,7 +60,6 @@ class WalletConnectModal extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Row(
               children: [
                 Icon(
@@ -89,7 +85,6 @@ class WalletConnectModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // QR Code
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -114,7 +109,6 @@ class WalletConnectModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Instructions
             Text(
               'Mobil cüzdan uygulamanızda WalletConnect ile QR kodu tarayın',
               textAlign: TextAlign.center,
@@ -125,7 +119,6 @@ class WalletConnectModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Supported wallets
             Text(
               'Desteklenen Cüzdanlar',
               style: TextStyle(
@@ -147,7 +140,6 @@ class WalletConnectModal extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Action buttons
             Row(
               children: [
                 Expanded(
@@ -177,7 +169,6 @@ class WalletConnectModal extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Help text
             Text(
               'QR kod 5 dakika süre ile geçerlidir',
               style: TextStyle(

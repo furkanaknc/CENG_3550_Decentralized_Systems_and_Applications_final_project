@@ -23,7 +23,6 @@ import type { RecyclingLocation } from '../src/models';
 
 const migrationPath = resolve(__dirname, '../db/migrations/0001_init.sql');
 let migrationSql = readFileSync(migrationPath, 'utf-8');
-// pg-mem does not support DO blocks, strip the migration guard for enum creation.
 migrationSql = migrationSql.replace(/DO \$\$[\s\S]*?\$\$;/g, '');
 
 const defaultCourier = {

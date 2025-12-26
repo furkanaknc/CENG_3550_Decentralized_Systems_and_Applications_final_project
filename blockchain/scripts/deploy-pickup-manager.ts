@@ -9,7 +9,6 @@ async function main() {
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log('Account balance:', ethers.formatEther(balance), 'ETH');
 
-  // Deploy PickupManager
   const PickupManager = await ethers.getContractFactory('PickupManager');
   const pickupManager = await PickupManager.deploy();
   await pickupManager.waitForDeployment();
@@ -17,7 +16,6 @@ async function main() {
   const address = await pickupManager.getAddress();
   console.log('PickupManager deployed to:', address);
 
-  // Optionally deploy GreenReward as well
   const GreenReward = await ethers.getContractFactory('GreenReward');
   const greenReward = await GreenReward.deploy();
   await greenReward.waitForDeployment();

@@ -13,11 +13,9 @@ export async function login(req: Request, res: Response) {
   }
 
   try {
-    // Check if user already exists
     let user = await getUserByWallet(walletAddress.toLowerCase());
 
     if (!user) {
-      // Create new user with default 'user' role
       user = await createOrUpdateUser({
         walletAddress,
         name: name || undefined,
@@ -49,7 +47,7 @@ async function ensureCourierExistsForLogin(
   userName: string
 ): Promise<void> {
   const { query } = await import('../db/client');
-  const courierId = 'courier-' + userId.substring(5); // 'user-' kısmını çıkar
+  const courierId = 'courier-' + userId.substring(5);
 
   await query(
     `INSERT INTO couriers (id, name, active, latitude, longitude, user_id)

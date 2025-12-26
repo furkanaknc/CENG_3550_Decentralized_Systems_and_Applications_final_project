@@ -111,7 +111,7 @@ describe("PickupManager meta-transactions", function () {
 
     const pickup = await contract.getPickup("PK-1");
     expect(pickup.courier).to.equal(await courier.getAddress());
-    expect(pickup.status).to.equal(1); // Assigned
+    expect(pickup.status).to.equal(1);
     expect(await contract.courierActivePickups(await courier.getAddress())).to.equal(1n);
   });
 

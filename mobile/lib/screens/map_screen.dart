@@ -235,7 +235,7 @@ class _MapScreenState extends State<MapScreen> {
         }),
       );
 
-      Navigator.pop(context); // Close loading
+      Navigator.pop(context);
 
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -244,7 +244,7 @@ class _MapScreenState extends State<MapScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        _loadPoints(); // Refresh map
+        _loadPoints();
       } else {
         throw Exception('Sunucu hatası: ${response.statusCode}');
       }

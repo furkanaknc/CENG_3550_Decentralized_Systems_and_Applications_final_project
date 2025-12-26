@@ -263,7 +263,6 @@ export async function syncUserRole(req: AuthenticatedRequest, res: Response) {
   }
 }
 
-// ============ Location Management ============
 
 import {
   listAllLocations,

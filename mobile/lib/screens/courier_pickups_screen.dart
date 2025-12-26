@@ -49,7 +49,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
 
     try {
       if (_tabController.index == 0) {
-        // Bekleyen talepler
         final pickups = await _api.getPendingPickups();
         if (mounted) {
           setState(() {
@@ -57,7 +56,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           });
         }
       } else {
-        // Kabul edilmiş taleplerim
         final pickups = await _api.getMyPickups();
         if (mounted) {
           setState(() {
@@ -92,7 +90,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           ),
         );
 
-        // Reload pickups
         _loadPickups();
       }
     } catch (e) {
@@ -109,7 +106,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
 
   Future<void> _completePickup(String pickupId) async {
     try {
-      // Cüzdanda approval zaten gelecek, ekstra onay dialoguna gerek yok
       await _api.completePickup(pickupId);
 
       if (mounted) {
@@ -120,7 +116,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           ),
         );
 
-        // Reload pickups
         _loadPickups();
       }
     } catch (e) {
@@ -298,7 +293,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
               ),
             ],
             const SizedBox(height: 12),
-            // Buttons
             if (isPending && pickup.status == 'pending')
               SizedBox(
                 width: double.infinity,
@@ -492,7 +486,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
       ),
       body: Column(
         children: [
-          // User info banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -540,7 +533,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             ),
           ),
 
-          // Tab views
           Expanded(
             child: TabBarView(
               controller: _tabController,

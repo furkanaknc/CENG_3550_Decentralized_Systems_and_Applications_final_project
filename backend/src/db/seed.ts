@@ -10,7 +10,6 @@ async function runSeed(): Promise<void> {
     await pool.query(sql);
     console.log('✅ Seed data başarıyla eklendi');
     
-    // Eklenen verileri kontrol et
     const result = await pool.query('SELECT COUNT(*) as count FROM recycling_locations');
     console.log(`📍 Toplam ${result.rows[0].count} geri dönüşüm noktası`);
   } catch (error) {

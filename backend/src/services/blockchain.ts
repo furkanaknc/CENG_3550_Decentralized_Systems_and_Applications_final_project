@@ -201,7 +201,6 @@ async function ensureRoleAssigned(
     const receipt = await tx.wait();
     return receipt.hash;
   } catch (error: any) {
-    // If transaction is already known (pending in mempool), we can safely proceed
     if (
       error.code === 'UNKNOWN_ERROR' &&
       error.error?.message === 'already known'
@@ -238,7 +237,6 @@ async function ensurePickupExists(
       const receipt = await tx.wait();
       summary.pickupCreatedTxHash = receipt.hash;
     } catch (error: any) {
-      // If transaction is already known (pending in mempool), we can safely proceed
       if (
         error.code === 'UNKNOWN_ERROR' &&
         error.error?.message === 'already known'
@@ -276,7 +274,6 @@ async function mintReward(
     const receipt = await tx.wait();
     return { txHash: receipt.hash, amount: rewardAmount };
   } catch (error: any) {
-    // If transaction is already known (pending in mempool), we can safely proceed
     if (
       error.code === 'UNKNOWN_ERROR' &&
       error.error?.message === 'already known'
@@ -377,8 +374,6 @@ export async function syncPickupAssignment(
     const receipt = await tx.wait();
     summary.pickupAcceptedTxHash = receipt.hash;
   } catch (error: any) {
-    // If transaction is already known (pending in mempool), we can safely proceed
-    // The transaction will eventually be mined
     if (
       error.code === 'UNKNOWN_ERROR' &&
       error.error?.message === 'already known'
@@ -388,7 +383,6 @@ export async function syncPickupAssignment(
       );
       summary.pickupAcceptedTxHash = 'pending';
     } else {
-      // Re-throw other errors
       throw error;
     }
   }
@@ -476,7 +470,6 @@ export async function syncPickupCompletion(
         const receipt = await tx.wait();
         summary.pickupCompletedTxHash = receipt.hash;
       } catch (error: any) {
-        // If transaction is already known (pending in mempool), we can safely proceed
         if (isAlreadyKnownError(error)) {
           console.log(
             `⚠️ Transaction for pickup completion ${pickup.id} is already pending, continuing...`

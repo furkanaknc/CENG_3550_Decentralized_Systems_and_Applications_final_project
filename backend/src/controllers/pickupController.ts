@@ -19,7 +19,6 @@ export async function createPickup(req: Request, res: Response) {
     return res.status(400).json({ message: 'Missing pickup fields' });
   }
 
-  // pickupLocation.coordinates yapısından coordinates'i çıkar
   const coordinates = pickupLocation.coordinates || pickupLocation;
 
   if (!coordinates.latitude || !coordinates.longitude) {

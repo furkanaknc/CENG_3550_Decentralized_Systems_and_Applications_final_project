@@ -139,7 +139,6 @@ class _HomeShellState extends State<HomeShell> {
       destinations = _userDestinations;
     }
 
-    // Reset index if it's out of bounds
     if (_index >= pages.length) {
       _index = 0;
     }
@@ -150,7 +149,6 @@ class _HomeShellState extends State<HomeShell> {
         backgroundColor: isAdmin ? Colors.purple.shade700 : Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
-          // Role badge
           Container(
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

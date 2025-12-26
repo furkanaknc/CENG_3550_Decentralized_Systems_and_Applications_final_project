@@ -31,7 +31,6 @@ router.get("/pickups", getAllPickups);
 
 router.get("/couriers", getAllCouriers);
 
-// Recycling locations management
 router.get("/locations", getLocations);
 router.post("/locations", createLocation);
 router.delete("/locations/:id", removeLocation);
