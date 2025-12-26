@@ -53,8 +53,7 @@ class PickupRequestResult {
   final PickupSummary pickup;
   final List<RecyclingPoint> nearbyLocations;
 
-  String get confirmationMessage =>
-      'Talebiniz alındı (#${pickup.id}). '
+  String get confirmationMessage => 'Talebiniz alındı (#${pickup.id}). '
       '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material} kaydedildi.';
 }
 
@@ -81,9 +80,8 @@ class ApiException implements Exception {
 /// API istemcisi backend ile haberleşmeyi üstlenir.
 class ApiService {
   ApiService._internal() {
-    _baseUrl = _sanitizeBaseUrl(
-      dotenv.env['API_BASE_URL'] ?? 'http://localhost:4000'
-    );
+    _baseUrl =
+        _sanitizeBaseUrl(dotenv.env['API_BASE_URL'] ?? 'http://localhost:4000');
   }
 
   static final ApiService _singleton = ApiService._internal();
@@ -113,27 +111,37 @@ class ApiService {
 
   Uri _uri(String path, [Map<String, String>? queryParameters]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$_baseUrl$normalizedPath').replace(queryParameters: queryParameters);
+    return Uri.parse('$_baseUrl$normalizedPath')
+        .replace(queryParameters: queryParameters);
   }
 
   Future<List<RecyclingPoint>> fetchRecyclingPoints({
     double? latitude,
     double? longitude,
-    double radiusKm = 5,
+    double radiusKm = 10,
+    bool showAll = false,
   }) async {
-    final lat = latitude ?? _defaultLatitude;
-    final lon = longitude ?? _defaultLongitude;
+    late final http.Response response;
 
-    final response = await _client.get(
-      _uri('/api/maps/nearby', {
-        'lat': lat.toString(),
-        'lon': lon.toString(),
-        'radiusKm': radiusKm.toString(),
-      }),
-    );
+    if (showAll) {
+      // Admin mode: get all locations
+      response = await _client.get(_uri('/api/maps/all'));
+    } else {
+      // User mode: get nearby locations
+      final lat = latitude ?? _defaultLatitude;
+      final lon = longitude ?? _defaultLongitude;
+      response = await _client.get(
+        _uri('/api/maps/nearby', {
+          'lat': lat.toString(),
+          'lon': lon.toString(),
+          'radiusKm': radiusKm.toString(),
+        }),
+      );
+    }
 
     if (response.statusCode != 200) {
-      throw ApiException('Geri dönüşüm merkezleri alınamadı', response.statusCode);
+      throw ApiException(
+          'Geri dönüşüm merkezleri alınamadı', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -176,8 +184,8 @@ class ApiService {
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final pickup =
         payload['pickup'] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final pickupLocation =
-        pickup['pickupLocation'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final pickupLocation = pickup['pickupLocation'] as Map<String, dynamic>? ??
+        const <String, dynamic>{};
     final suggestions =
         _mapRecyclingPoints(payload['nearbyLocations'] as List<dynamic>?);
 
@@ -187,9 +195,11 @@ class ApiService {
       weightKg: (pickup['weightKg'] as num?)?.toDouble() ?? weightKg,
       status: pickup['status']?.toString() ?? 'pending',
       latitude: (pickupLocation['latitude'] as num?)?.toDouble() ??
-          latitude ?? _defaultLatitude,
+          latitude ??
+          _defaultLatitude,
       longitude: (pickupLocation['longitude'] as num?)?.toDouble() ??
-          longitude ?? _defaultLongitude,
+          longitude ??
+          _defaultLongitude,
       createdAt: _parseDateTime(pickup['createdAt']),
       updatedAt: _parseDateTime(pickup['updatedAt']),
     );
@@ -221,7 +231,7 @@ class ApiService {
   /// Kurye için bekleyen talepleri getir
   Future<List<PickupSummary>> getPendingPickups() async {
     final headers = _auth.getAuthHeaders();
-    
+
     final response = await _client.get(
       _uri('/api/couriers/pickups/pending'),
       headers: headers,
@@ -233,45 +243,41 @@ class ApiService {
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final pickups = payload['pickups'] as List<dynamic>? ?? [];
-    
-    return pickups
-        .map(_parsePickupSummary)
-        .whereType<PickupSummary>()
-        .toList();
+
+    return pickups.map(_parsePickupSummary).whereType<PickupSummary>().toList();
   }
 
   /// Kurye için kabul edilmiş (assigned) talepleri getir
   Future<List<PickupSummary>> getMyPickups() async {
     final headers = _auth.getAuthHeaders();
-    
+
     final response = await _client.get(
       _uri('/api/couriers/my-pickups'),
       headers: headers,
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Kabul edilmiş talepler alınamadı', response.statusCode);
+      throw ApiException(
+          'Kabul edilmiş talepler alınamadı', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final pickups = payload['pickups'] as List<dynamic>? ?? [];
-    
-    return pickups
-        .map(_parsePickupSummary)
-        .whereType<PickupSummary>()
-        .toList();
+
+    return pickups.map(_parsePickupSummary).whereType<PickupSummary>().toList();
   }
 
   /// Kurye için talep kabul etme
   Future<PickupSummary> acceptPickup(String pickupId) async {
     // Try to create signature if wallet is connected
     Map<String, dynamic>? courierApproval;
-    
+
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
-    
+
     if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
       try {
-        courierApproval = await createAcceptPickupSignature(pickupId, pickupManagerAddress);
+        courierApproval =
+            await createAcceptPickupSignature(pickupId, pickupManagerAddress);
       } catch (e) {
         print('Failed to create signature, continuing without it: $e');
         // If blockchain is not configured on backend, continue without signature
@@ -283,7 +289,7 @@ class ApiService {
       ..._auth.getAuthHeaders(),
     };
 
-    final body = courierApproval != null 
+    final body = courierApproval != null
         ? jsonEncode({'courierApproval': courierApproval})
         : '{}';
 
@@ -308,12 +314,13 @@ class ApiService {
   Future<PickupSummary> completePickup(String pickupId) async {
     // Try to create signature if wallet is connected
     Map<String, dynamic>? courierApproval;
-    
+
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
-    
+
     if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
       try {
-        courierApproval = await createCompletePickupSignature(pickupId, pickupManagerAddress);
+        courierApproval =
+            await createCompletePickupSignature(pickupId, pickupManagerAddress);
       } catch (e) {
         print('Failed to create signature, continuing without it: $e');
         // If blockchain is not configured on backend, continue without signature
@@ -325,7 +332,7 @@ class ApiService {
       ..._auth.getAuthHeaders(),
     };
 
-    final body = courierApproval != null 
+    final body = courierApproval != null
         ? jsonEncode({'courierApproval': courierApproval})
         : '{}';
 
@@ -371,7 +378,8 @@ class ApiService {
 
     try {
       final nonceData = await getCourierNonce();
-      final blockchainEnabled = nonceData['blockchainEnabled'] as bool? ?? false;
+      final blockchainEnabled =
+          nonceData['blockchainEnabled'] as bool? ?? false;
 
       if (!blockchainEnabled) {
         return null; // Blockchain not configured, no signature needed
@@ -438,7 +446,8 @@ class ApiService {
 
     try {
       final nonceData = await getCourierNonce();
-      final blockchainEnabled = nonceData['blockchainEnabled'] as bool? ?? false;
+      final blockchainEnabled =
+          nonceData['blockchainEnabled'] as bool? ?? false;
 
       if (!blockchainEnabled) {
         return null; // Blockchain not configured, no signature needed
@@ -501,14 +510,16 @@ class ApiService {
     if (pickup == null) return null;
 
     final pickupLocation = pickup['pickupLocation'] as Map<String, dynamic>?;
-    
+
     return PickupSummary(
       id: pickup['id']?.toString() ?? '',
       material: pickup['material']?.toString() ?? '',
       weightKg: (pickup['weightKg'] as num?)?.toDouble() ?? 0.0,
       status: pickup['status']?.toString() ?? 'pending',
-      latitude: (pickupLocation?['latitude'] as num?)?.toDouble() ?? _defaultLatitude,
-      longitude: (pickupLocation?['longitude'] as num?)?.toDouble() ?? _defaultLongitude,
+      latitude:
+          (pickupLocation?['latitude'] as num?)?.toDouble() ?? _defaultLatitude,
+      longitude: (pickupLocation?['longitude'] as num?)?.toDouble() ??
+          _defaultLongitude,
       createdAt: _parseDateTime(pickup['createdAt']),
       updatedAt: _parseDateTime(pickup['updatedAt']),
     );
@@ -531,16 +542,18 @@ class ApiService {
       return null;
     }
 
-    final coordinates =
-        location['coordinates'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final coordinates = location['coordinates'] as Map<String, dynamic>? ??
+        const <String, dynamic>{};
     final acceptedMaterials =
         (location['acceptedMaterials'] as List<dynamic>? ?? const <dynamic>[])
             .map((dynamic material) => material.toString())
             .where((material) => material.isNotEmpty)
             .toList();
 
-    final latitude = (coordinates['latitude'] as num?)?.toDouble() ?? _defaultLatitude;
-    final longitude = (coordinates['longitude'] as num?)?.toDouble() ?? _defaultLongitude;
+    final latitude =
+        (coordinates['latitude'] as num?)?.toDouble() ?? _defaultLatitude;
+    final longitude =
+        (coordinates['longitude'] as num?)?.toDouble() ?? _defaultLongitude;
 
     return RecyclingPoint(
       id: location['id']?.toString() ??

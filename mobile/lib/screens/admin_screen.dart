@@ -29,6 +29,12 @@ class _AdminScreenState extends State<AdminScreen>
     return apiUrl.replaceAll(RegExp(r'/+$'), '');
   }
 
+  bool _isCurrentUser(String? userId) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || userId == null) return false;
+    return currentUser.id == userId;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -149,6 +155,10 @@ class _AdminScreenState extends State<AdminScreen>
           const SnackBar(content: Text('Rol güncellendi')),
         );
         _loadUsers();
+      } else if (response.statusCode == 403) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kendi rolünüzü değiştiremezsiniz')),
+        );
       } else {
         throw Exception('Failed to update role');
       }
@@ -159,8 +169,59 @@ class _AdminScreenState extends State<AdminScreen>
     }
   }
 
+  Future<void> _confirmDeleteUser(Map<String, dynamic> user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning, color: Colors.red, size: 48),
+        title: const Text('Kullanıcıyı Sil'),
+        content: Text(
+            '"${user['name']}" kullanıcısını silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteUser(user['id'], user['name']);
+    }
+  }
+
+  Future<void> _deleteUser(String userId, String userName) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse('$_baseUrl/api/admin/users/$userId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ "$userName" silindi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadUsers();
+      } else {
+        throw Exception('Failed to delete user');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Silinemedi: $e')),
+      );
+    }
+  }
+
   Future<void> _updateMaterialWeight(String material, int weight) async {
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -189,13 +250,12 @@ class _AdminScreenState extends State<AdminScreen>
         body: jsonEncode({'weight': weight}),
       );
 
-      Navigator.pop(context); // Close loading dialog
+      Navigator.pop(context);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final txHash = data['txHash'] ?? 'N/A';
 
-        // Show success dialog with details
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -248,7 +308,7 @@ class _AdminScreenState extends State<AdminScreen>
         throw Exception('Sunucu hatası: ${response.statusCode}');
       }
     } catch (e) {
-      Navigator.pop(context); // Close loading dialog if still open
+      Navigator.pop(context);
 
       showDialog(
         context: context,
@@ -425,14 +485,35 @@ class _AdminScreenState extends State<AdminScreen>
                 'Rol: ${user['role']} | Puan: ${user['greenPoints']}',
               ),
               isThreeLine: true,
-              trailing: PopupMenuButton<String>(
-                onSelected: (role) => _updateUserRole(user['id'], role),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'user', child: Text('User')),
-                  const PopupMenuItem(value: 'courier', child: Text('Kurye')),
-                  const PopupMenuItem(value: 'admin', child: Text('Admin')),
-                ],
-              ),
+              trailing: _isCurrentUser(user['id'])
+                  ? const Chip(
+                      label: Text('Sen'),
+                      backgroundColor: Colors.purple,
+                      labelStyle: TextStyle(color: Colors.white, fontSize: 12),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PopupMenuButton<String>(
+                          tooltip: 'Rol Değiştir',
+                          onSelected: (role) =>
+                              _updateUserRole(user['id'], role),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                                value: 'user', child: Text('User')),
+                            const PopupMenuItem(
+                                value: 'courier', child: Text('Kurye')),
+                            const PopupMenuItem(
+                                value: 'admin', child: Text('Admin')),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: 'Sil',
+                          onPressed: () => _confirmDeleteUser(user),
+                        ),
+                      ],
+                    ),
             ),
           );
         },

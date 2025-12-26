@@ -13,7 +13,6 @@ import {
   setMaterialWeight,
   getBlockchainStats,
   assignRoleOnChain,
-  getUserRoleOnChain,
 } from "../services/adminBlockchain";
 import { isBlockchainConfigured } from "../services/blockchain";
 
@@ -71,6 +70,10 @@ export async function updateRole(req: AuthenticatedRequest, res: Response) {
 
   if (!["user", "courier", "admin"].includes(role)) {
     return res.status(400).json({ message: "Invalid role" });
+  }
+
+  if (req.user && req.user.id === id) {
+    return res.status(403).json({ message: "You cannot change your own role" });
   }
 
   try {

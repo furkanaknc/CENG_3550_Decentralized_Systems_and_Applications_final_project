@@ -45,7 +45,7 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadPoints() async {
     try {
-      final points = await ApiService().fetchRecyclingPoints();
+      final points = await ApiService().fetchRecyclingPoints(showAll: _isAdmin);
       if (!mounted) {
         return;
       }
