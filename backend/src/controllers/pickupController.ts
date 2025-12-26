@@ -1,28 +1,31 @@
-import { Request, Response } from 'express';
-import { v4 as uuid } from 'uuid';
-import mapService from '../services/maps';
+import { Request, Response } from "express";
+import { v4 as uuid } from "uuid";
+import mapService from "../services/maps";
 import {
   createPickup as createPickupRecord,
   getPickupById,
-  listPickups as listPickupRecords
-} from '../repositories/pickupsRepository';
-import { ensureUserExists, getUserById } from '../repositories/usersRepository';
-import { getCourierByIdWithWallet } from '../repositories/couriersRepository';
-import { assignCourierAndSync, completePickupAndReward } from '../services/pickupLifecycle';
-import { isBlockchainConfigured } from '../services/blockchain';
-import { parseCourierApprovalPayload } from '../utils/courierApproval';
+  listPickups as listPickupRecords,
+} from "../repositories/pickupsRepository";
+import { ensureUserExists, getUserById } from "../repositories/usersRepository";
+import { getCourierByIdWithWallet } from "../repositories/couriersRepository";
+import {
+  assignCourierAndSync,
+  completePickupAndReward,
+} from "../services/pickupLifecycle";
+import { isBlockchainConfigured } from "../services/blockchain";
+import { parseCourierApprovalPayload } from "../utils/courierApproval";
 
 export async function createPickup(req: Request, res: Response) {
-  const { userId, material, weightKg, pickupLocation } = req.body;
+  const { userId, material, weightKg, pickupLocation, address } = req.body;
 
   if (!userId || !material || !weightKg || !pickupLocation) {
-    return res.status(400).json({ message: 'Missing pickup fields' });
+    return res.status(400).json({ message: "Missing pickup fields" });
   }
 
   const coordinates = pickupLocation.coordinates || pickupLocation;
 
   if (!coordinates.latitude || !coordinates.longitude) {
-    return res.status(400).json({ message: 'Missing pickup coordinates' });
+    return res.status(400).json({ message: "Missing pickup coordinates" });
   }
 
   try {
@@ -33,17 +36,18 @@ export async function createPickup(req: Request, res: Response) {
       userId,
       material,
       weightKg,
-      pickupLocation: coordinates
+      pickupLocation: coordinates,
+      address: address || undefined,
     });
     const locations = await mapService.findNearbyLocations(coordinates);
 
     return res.status(201).json({
       pickup,
-      nearbyLocations: locations
+      nearbyLocations: locations,
     });
   } catch (error) {
-    console.error('Failed to create pickup', error);
-    return res.status(500).json({ message: 'Pickup could not be created' });
+    console.error("Failed to create pickup", error);
+    return res.status(500).json({ message: "Pickup could not be created" });
   }
 }
 
@@ -52,7 +56,7 @@ export async function assignCourier(req: Request, res: Response) {
   const { courierId, dropoffLocation } = req.body;
 
   if (!courierId) {
-    return res.status(400).json({ message: 'courierId is required' });
+    return res.status(400).json({ message: "courierId is required" });
   }
 
   if (
@@ -64,7 +68,7 @@ export async function assignCourier(req: Request, res: Response) {
   ) {
     return res
       .status(400)
-      .json({ message: 'dropoffLocation requires id and coordinates' });
+      .json({ message: "dropoffLocation requires id and coordinates" });
   }
 
   let courierApproval;
@@ -78,12 +82,12 @@ export async function assignCourier(req: Request, res: Response) {
   try {
     const pickup = await getPickupById(id);
     if (!pickup) {
-      return res.status(404).json({ message: 'Pickup not found' });
+      return res.status(404).json({ message: "Pickup not found" });
     }
 
     const courier = await getCourierByIdWithWallet(courierId);
     if (!courier) {
-      return res.status(404).json({ message: 'Courier not found' });
+      return res.status(404).json({ message: "Courier not found" });
     }
 
     const user = await getUserById(pickup.userId);
@@ -92,13 +96,14 @@ export async function assignCourier(req: Request, res: Response) {
     if (isBlockchainConfigured()) {
       if (!userWallet) {
         return res.status(400).json({
-          message: 'Pickup owner must have a wallet address for blockchain sync'
+          message:
+            "Pickup owner must have a wallet address for blockchain sync",
         });
       }
 
       if (!courier.walletAddress) {
         return res.status(400).json({
-          message: 'Courier must have a wallet address for blockchain sync'
+          message: "Courier must have a wallet address for blockchain sync",
         });
       }
     }
@@ -120,8 +125,8 @@ export async function assignCourier(req: Request, res: Response) {
 
     res.json({ pickup: updatedPickup, route, blockchain });
   } catch (error) {
-    console.error('Failed to assign courier', error);
-    res.status(500).json({ message: 'Unable to assign courier' });
+    console.error("Failed to assign courier", error);
+    res.status(500).json({ message: "Unable to assign courier" });
   }
 }
 
@@ -139,7 +144,7 @@ export async function completePickup(req: Request, res: Response) {
   try {
     const pickup = await getPickupById(id);
     if (!pickup) {
-      return res.status(404).json({ message: 'Pickup not found' });
+      return res.status(404).json({ message: "Pickup not found" });
     }
 
     const user = await getUserById(pickup.userId);
@@ -149,22 +154,26 @@ export async function completePickup(req: Request, res: Response) {
 
     if (isBlockchainConfigured() && !user?.walletAddress) {
       return res.status(400).json({
-        message: 'Pickup owner must have a wallet address for blockchain sync'
+        message: "Pickup owner must have a wallet address for blockchain sync",
       });
     }
 
-    const { pickup: completedPickup, carbon, points, blockchain } =
-      await completePickupAndReward(
-        pickup,
-        user?.walletAddress,
-        courierWallet,
-        courierApproval
-      );
+    const {
+      pickup: completedPickup,
+      carbon,
+      points,
+      blockchain,
+    } = await completePickupAndReward(
+      pickup,
+      user?.walletAddress,
+      courierWallet,
+      courierApproval
+    );
 
     res.json({ pickup: completedPickup, carbon, points, blockchain });
   } catch (error) {
-    console.error('Failed to complete pickup', error);
-    res.status(500).json({ message: 'Unable to complete pickup' });
+    console.error("Failed to complete pickup", error);
+    res.status(500).json({ message: "Unable to complete pickup" });
   }
 }
 
@@ -172,7 +181,7 @@ export function listPickups(_req: Request, res: Response) {
   listPickupRecords()
     .then((pickups) => res.json({ pickups }))
     .catch((error) => {
-      console.error('Failed to list pickups', error);
-      res.status(500).json({ message: 'Unable to list pickups' });
+      console.error("Failed to list pickups", error);
+      res.status(500).json({ message: "Unable to list pickups" });
     });
 }
