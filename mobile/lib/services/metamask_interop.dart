@@ -173,3 +173,46 @@ Future<List<String>> getAccounts() async {
     return [];
   }
 }
+
+Future<String?> signTypedDataMetaMask(
+    String address, Map<String, dynamic> typedData) async {
+  final provider = _getMetaMaskProvider();
+  if (provider == null) return null;
+
+  try {
+    final typedDataJson = _jsonEncode(typedData);
+    final signature =
+        await promiseToFuture<String>(callMethod(provider, 'request', [
+      jsify({
+        'method': 'eth_signTypedData_v4',
+        'params': [address, typedDataJson],
+      })
+    ]));
+    return signature;
+  } catch (e) {
+    print('Failed to sign typed data with MetaMask: $e');
+    return null;
+  }
+}
+
+String _jsonEncode(Map<String, dynamic> data) {
+  return _encodeValue(data);
+}
+
+String _encodeValue(dynamic value) {
+  if (value == null) return 'null';
+  if (value is String) return '"${value.replaceAll('"', '\\"')}"';
+  if (value is num) return value.toString();
+  if (value is bool) return value.toString();
+  if (value is List) {
+    final items = value.map(_encodeValue).join(',');
+    return '[$items]';
+  }
+  if (value is Map) {
+    final entries = value.entries
+        .map((e) => '"${e.key}":${_encodeValue(e.value)}')
+        .join(',');
+    return '{$entries}';
+  }
+  return value.toString();
+}

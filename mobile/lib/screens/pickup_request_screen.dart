@@ -312,7 +312,6 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                 ),
               )
             else ...[
-              // Otomatik adres bilgisi (read-only)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -340,7 +339,6 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Kullanıcı input alanları
               TextFormField(
                 controller: _streetController,
                 decoration: const InputDecoration(

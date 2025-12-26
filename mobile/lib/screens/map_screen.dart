@@ -341,7 +341,6 @@ class _MapScreenState extends State<MapScreen> {
         )
         .toList();
 
-    // Add user location marker (blue)
     if (!_isAdmin && _location.currentPosition != null) {
       markers.add(
         Marker(
@@ -406,7 +405,6 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(markers: markers),
           ],
         ),
-        // Location selection mode indicator
         if (_isSelectingLocation)
           Positioned(
             top: 80,
@@ -438,7 +436,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-        // Location selection FAB (for non-admins)
         if (!_isAdmin)
           Positioned(
             bottom: 24,

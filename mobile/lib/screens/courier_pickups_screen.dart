@@ -131,10 +131,14 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   }
 
   Future<void> _completePickup(String pickupId) async {
+    _showProcessingDialog(
+        'İmza bekleniyor...', 'Lütfen cüzdanınızda imza onayı verin');
+
     try {
       await _api.completePickup(pickupId);
 
       if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Talep tamamlandı! 🎉'),
@@ -146,6 +150,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
       }
     } catch (e) {
       if (mounted) {
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hata: ${e.toString()}'),
@@ -153,6 +158,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           ),
         );
       }
+    } finally {
+      // Dialog already closed
     }
   }
 
