@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import mapService from '../services/maps';
-import openStreetMapClient from '../services/openStreetMap';
+import { Request, Response } from "express";
+import mapService from "../services/maps";
+import openStreetMapClient from "../services/openStreetMap";
 
 export async function searchAddress(req: Request, res: Response) {
   const query = req.query.q as string | undefined;
@@ -8,19 +8,19 @@ export async function searchAddress(req: Request, res: Response) {
   const countrycodes = req.query.countrycodes as string | undefined;
 
   if (!query) {
-    return res.status(400).json({ message: 'q parametresi zorunludur' });
+    return res.status(400).json({ message: "q parametresi zorunludur" });
   }
 
   const limit = limitParam ? Number(limitParam) : undefined;
 
   if (limit !== undefined && Number.isNaN(limit)) {
-    return res.status(400).json({ message: 'limit sayısal olmalıdır' });
+    return res.status(400).json({ message: "limit sayısal olmalıdır" });
   }
 
   try {
     const results = await openStreetMapClient.search(query, {
       limit,
-      countrycodes
+      countrycodes,
     });
 
     const payload = results.map((result) => ({
@@ -29,17 +29,19 @@ export async function searchAddress(req: Request, res: Response) {
       displayName: result.display_name,
       coordinates: {
         latitude: Number(result.lat),
-        longitude: Number(result.lon)
+        longitude: Number(result.lon),
       },
       category: result.class,
       type: result.type,
-      address: result.address ?? {}
+      address: result.address ?? {},
     }));
 
     return res.json({ results: payload });
   } catch (error) {
-    console.error('OpenStreetMap araması başarısız oldu', error);
-    return res.status(502).json({ message: 'OpenStreetMap araması sırasında hata oluştu' });
+    console.error("OpenStreetMap araması başarısız oldu", error);
+    return res
+      .status(502)
+      .json({ message: "OpenStreetMap araması sırasında hata oluştu" });
   }
 }
 
@@ -48,14 +50,16 @@ export async function reverseGeocode(req: Request, res: Response) {
   const lonParam = req.query.lon as string | undefined;
 
   if (!latParam || !lonParam) {
-    return res.status(400).json({ message: 'lat ve lon parametreleri zorunludur' });
+    return res
+      .status(400)
+      .json({ message: "lat ve lon parametreleri zorunludur" });
   }
 
   const latitude = Number(latParam);
   const longitude = Number(lonParam);
 
   if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-    return res.status(400).json({ message: 'lat ve lon sayısal olmalıdır' });
+    return res.status(400).json({ message: "lat ve lon sayısal olmalıdır" });
   }
 
   try {
@@ -66,15 +70,17 @@ export async function reverseGeocode(req: Request, res: Response) {
       displayName: result.display_name,
       coordinates: {
         latitude: Number(result.lat),
-        longitude: Number(result.lon)
+        longitude: Number(result.lon),
       },
       address: result.address ?? {},
       osmType: result.osm_type,
-      osmId: result.osm_id
+      osmId: result.osm_id,
     });
   } catch (error) {
-    console.error('OpenStreetMap reverse geocode başarısız oldu', error);
-    return res.status(502).json({ message: 'OpenStreetMap reverse geocode sırasında hata oluştu' });
+    console.error("OpenStreetMap reverse geocode başarısız oldu", error);
+    return res
+      .status(502)
+      .json({ message: "OpenStreetMap reverse geocode sırasında hata oluştu" });
   }
 }
 
@@ -84,22 +90,47 @@ export async function getNearbyRecyclingCenters(req: Request, res: Response) {
   const radiusParam = req.query.radiusKm as string | undefined;
 
   if (!latParam || !lonParam) {
-    return res.status(400).json({ message: 'lat ve lon parametreleri zorunludur' });
+    return res
+      .status(400)
+      .json({ message: "lat ve lon parametreleri zorunludur" });
   }
 
   const latitude = Number(latParam);
   const longitude = Number(lonParam);
   const radiusKm = radiusParam ? Number(radiusParam) : 5;
 
-  if (Number.isNaN(latitude) || Number.isNaN(longitude) || Number.isNaN(radiusKm)) {
-    return res.status(400).json({ message: 'lat, lon ve radiusKm sayısal olmalıdır' });
+  if (
+    Number.isNaN(latitude) ||
+    Number.isNaN(longitude) ||
+    Number.isNaN(radiusKm)
+  ) {
+    return res
+      .status(400)
+      .json({ message: "lat, lon ve radiusKm sayısal olmalıdır" });
   }
 
   try {
-    const locations = await mapService.findNearbyLocations({ latitude, longitude }, radiusKm);
+    const locations = await mapService.findNearbyLocations(
+      { latitude, longitude },
+      radiusKm
+    );
     return res.json({ locations });
   } catch (error) {
-    console.error('Yakın geri dönüşüm merkezi araması başarısız oldu', error);
-    return res.status(502).json({ message: 'Yakındaki geri dönüşüm merkezleri alınamadı' });
+    console.error("Yakın geri dönüşüm merkezi araması başarısız oldu", error);
+    return res
+      .status(502)
+      .json({ message: "Yakındaki geri dönüşüm merkezleri alınamadı" });
+  }
+}
+
+export async function getAllRecyclingCenters(req: Request, res: Response) {
+  try {
+    const locations = await mapService.findAllLocations();
+    return res.json({ locations });
+  } catch (error) {
+    console.error("Geri dönüşüm merkezi listesi alınamadı", error);
+    return res
+      .status(502)
+      .json({ message: "Geri dönüşüm merkezleri alınamadı" });
   }
 }

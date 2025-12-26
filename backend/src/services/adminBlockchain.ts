@@ -152,19 +152,6 @@ export async function setMaterialWeight(
   }
 }
 
-export async function getUserRoleOnChain(address: string): Promise<RoleName> {
-  if (!isBlockchainConfigured()) {
-    throw new Error("Blockchain not configured");
-  }
-
-  const contract = ensurePickupManager();
-  const normalizedAddress = ethers.getAddress(address);
-  const roleNum = await contract.userRoles(normalizedAddress);
-
-  const roles: RoleName[] = ["None", "User", "Courier", "Admin"];
-  return roles[Number(roleNum)] || "None";
-}
-
 export async function assignRoleOnChain(
   address: string,
   role: "User" | "Courier" | "Admin"
