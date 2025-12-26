@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/metamask.dart' as metamask;
 import '../widgets/wallet_connect_modal.dart';
 import 'package:walletconnect_flutter_v2/walletconnect_flutter_v2.dart';
 
@@ -12,14 +14,25 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _auth = AuthService();
-  
+
   bool _isLoading = false;
+  bool _isMetaMaskLoading = false;
   String? _errorMessage;
+  bool _hasMetaMask = false;
 
   @override
   void initState() {
     super.initState();
+    _checkMetaMask();
     _tryRestoreSession();
+  }
+
+  void _checkMetaMask() {
+    if (kIsWeb) {
+      setState(() {
+        _hasMetaMask = metamask.isMetaMaskAvailable();
+      });
+    }
   }
 
   Future<void> _tryRestoreSession() async {
@@ -30,20 +43,55 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final user = await _auth.restoreSession();
-      
+
       if (user != null && mounted) {
         _navigateToHome();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = null; // Don't show error on initial load
+          _errorMessage = null;
         });
       }
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _connectWithMetaMask() async {
+    setState(() {
+      _isMetaMaskLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final address = await metamask.connectMetaMask();
+
+      if (address != null) {
+        await metamask.switchToSepoliaNetwork();
+
+        final response = await _auth.loginWithAddress(address);
+
+        if (response != null && mounted) {
+          _navigateToHome();
+        } else {
+          setState(() {
+            _errorMessage = 'Giriş başarısız oldu.';
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMetaMaskLoading = false;
         });
       }
     }
@@ -58,21 +106,18 @@ class _LoginScreenState extends State<LoginScreen> {
     ConnectResponse? connectResponse;
 
     try {
-      // Create WalletConnect session
       print('🔄 Creating WalletConnect session...');
       connectResponse = await _auth.loginWithWallet();
-      
+
       if (connectResponse is ConnectResponse && mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        // Show QR code modal
         final uri = connectResponse.uri;
         if (uri != null) {
           print('✅ QR URI created: ${uri.toString().substring(0, 50)}...');
-          
-          // Show modal and wait for connection in parallel
+
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -88,17 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
 
-          // Wait for wallet approval
           print('⏳ Waiting for wallet approval...');
           final user = await _auth.completeLogin(connectResponse);
-          
-          // Close modal
+
           if (mounted) {
             Navigator.of(context).pop();
           }
-          
+
           print('✅ Login completed, user: ${user?.walletAddress}');
-          
+
           if (user != null && mounted) {
             _navigateToHome();
           } else {
@@ -115,12 +158,11 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       print('❌ Error during connection: $e');
-      
-      // Close modal if open
+
       if (mounted && connectResponse != null) {
         Navigator.of(context).pop();
       }
-      
+
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
@@ -158,7 +200,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo/Icon
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -179,8 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
-                  // Title
                   const Text(
                     'Green Cycle',
                     style: TextStyle(
@@ -190,8 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // Subtitle
                   Text(
                     'Blockchain Tabanlı Geri Dönüşüm',
                     style: TextStyle(
@@ -200,8 +237,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 48),
-                  
-                  // Login Card
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -227,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          
+
                           if (_errorMessage != null)
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -239,18 +274,86 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.error_outline, color: Colors.red.shade700),
+                                  Icon(Icons.error_outline,
+                                      color: Colors.red.shade700),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       _errorMessage!,
-                                      style: TextStyle(color: Colors.red.shade700),
+                                      style:
+                                          TextStyle(color: Colors.red.shade700),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          
+
+                          if (_hasMetaMask) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton.icon(
+                                onPressed: _isMetaMaskLoading
+                                    ? null
+                                    : _connectWithMetaMask,
+                                icon: _isMetaMaskLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.white),
+                                        ),
+                                      )
+                                    : Image.network(
+                                        'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
+                                        width: 24,
+                                        height: 24,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                                Icons.account_balance_wallet),
+                                      ),
+                                label: Text(
+                                  _isMetaMaskLoading
+                                      ? 'Bağlanıyor...'
+                                      : 'MetaMask ile Giriş',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF6851B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child:
+                                        Divider(color: Colors.grey.shade300)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Text('veya',
+                                      style: TextStyle(
+                                          color: Colors.grey.shade500)),
+                                ),
+                                Expanded(
+                                    child:
+                                        Divider(color: Colors.grey.shade300)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
                           SizedBox(
                             width: double.infinity,
                             height: 56,
@@ -262,12 +365,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
                                       ),
                                     )
-                                  : const Icon(Icons.account_balance_wallet),
+                                  : const Icon(Icons.qr_code),
                               label: Text(
-                                _isLoading ? 'Bağlanıyor...' : 'Cüzdan ile Giriş Yap',
+                                _isLoading
+                                    ? 'Bağlanıyor...'
+                                    : 'QR Kod ile Bağlan',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -287,18 +394,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Info
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(Icons.info_outline, color: Colors.white),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Sepolia Test Network kullanılmaktadır',

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletconnect_flutter_v2/walletconnect_flutter_v2.dart';
 
@@ -17,13 +16,12 @@ class WalletService {
   String? get currentAddress => _currentAddress;
   bool get isConnected => _currentAddress != null && _currentSession != null;
 
-  /// Initialize WalletConnect
   Future<void> init() async {
     if (_web3App != null) return;
 
     try {
       _web3App = await Web3App.createInstance(
-        projectId: '274136f0aeb7d1332c2f2d0040584cfd', // TODO: https://cloud.walletconnect.com adresinden alın
+        projectId: '274136f0aeb7d1332c2f2d0040584cfd',
         metadata: const PairingMetadata(
           name: 'Green Cycle',
           description: 'Blockchain Tabanlı Geri Dönüşüm Platformu',
@@ -32,7 +30,6 @@ class WalletService {
         ),
       );
 
-      // Listen for session updates
       _web3App!.onSessionEvent.subscribe(_onSessionEvent);
       _web3App!.onSessionUpdate.subscribe(_onSessionUpdate);
       _web3App!.onSessionDelete.subscribe(_onSessionDelete);
@@ -44,17 +41,15 @@ class WalletService {
     }
   }
 
-  /// Connect wallet - returns URI for QR code display
   Future<ConnectResponse> createSession() async {
     if (_web3App == null) {
       await init();
     }
 
     try {
-      // Define required namespaces for Ethereum/Sepolia
       final requiredNamespaces = {
         'eip155': const RequiredNamespace(
-          chains: ['eip155:11155111'], // Sepolia chain
+          chains: ['eip155:11155111'],
           methods: [
             'eth_sendTransaction',
             'eth_signTransaction',
@@ -66,7 +61,6 @@ class WalletService {
         ),
       };
 
-      // Create connection
       final ConnectResponse response = await _web3App!.connect(
         requiredNamespaces: requiredNamespaces,
       );
@@ -78,48 +72,40 @@ class WalletService {
     }
   }
 
-  /// Wait for session approval and save connection
   Future<String?> waitForConnection(ConnectResponse response) async {
     try {
       print('⏳ Waiting for session approval...');
-      
-      // Wait for session approval with timeout
-      final SessionData? session = await response.session.future.timeout(
+
+      final SessionData session = await response.session.future.timeout(
         const Duration(minutes: 5),
         onTimeout: () {
           print('⏰ Session approval timeout');
-          throw Exception('Bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.');
+          throw Exception(
+              'Bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.');
         },
       );
 
-      print('📝 Session received: ${session?.topic}');
+      print('📝 Session received: ${session.topic}');
 
-      if (session != null) {
-        _currentSession = session.topic;
-        
-        // Get the connected address
-        final accounts = session.namespaces['eip155']?.accounts ?? [];
-        print('📋 Accounts: $accounts');
-        
-        if (accounts.isNotEmpty) {
-          // Format: eip155:11155111:0xAddress
-          final parts = accounts.first.split(':');
-          _currentAddress = parts.last.toLowerCase();
-          
-          print('✅ Connected address: $_currentAddress');
-          
-          // Save to local storage
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('wallet_address', _currentAddress!);
-          await prefs.setString('wallet_session', _currentSession!);
+      _currentSession = session.topic;
 
-          _addressController.add(_currentAddress);
-          return _currentAddress;
-        } else {
-          print('❌ No accounts in session');
-        }
+      final accounts = session.namespaces['eip155']?.accounts ?? [];
+      print('📋 Accounts: $accounts');
+
+      if (accounts.isNotEmpty) {
+        final parts = accounts.first.split(':');
+        _currentAddress = parts.last.toLowerCase();
+
+        print('✅ Connected address: $_currentAddress');
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('wallet_address', _currentAddress!);
+        await prefs.setString('wallet_session', _currentSession!);
+
+        _addressController.add(_currentAddress);
+        return _currentAddress;
       } else {
-        print('❌ Session is null');
+        print('❌ No accounts in session');
       }
 
       return null;
@@ -129,7 +115,6 @@ class WalletService {
     }
   }
 
-  /// Disconnect wallet
   Future<void> disconnect() async {
     if (_web3App != null && _currentSession != null) {
       try {
@@ -152,7 +137,6 @@ class WalletService {
     _addressController.add(null);
   }
 
-  /// Restore previous session
   Future<String?> restoreSession() async {
     if (_web3App == null) {
       await init();
@@ -167,7 +151,6 @@ class WalletService {
         return null;
       }
 
-      // Check if session still exists
       final sessions = _web3App!.sessions.getAll();
       final session = sessions.firstWhere(
         (s) => s.topic == savedSession,
@@ -181,7 +164,6 @@ class WalletService {
       return _currentAddress;
     } catch (e) {
       print('Failed to restore session: $e');
-      // Clear invalid session data
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('wallet_address');
       await prefs.remove('wallet_session');
@@ -189,7 +171,6 @@ class WalletService {
     }
   }
 
-  /// Request to switch to Sepolia network
   Future<bool> switchToSepolia() async {
     if (_web3App == null || _currentSession == null) {
       return false;
@@ -199,27 +180,25 @@ class WalletService {
       await _web3App!.request(
         topic: _currentSession!,
         chainId: 'eip155:11155111',
-        request: SessionRequestParams(
+        request: const SessionRequestParams(
           method: 'wallet_switchEthereumChain',
           params: [
-            {'chainId': '0xaa36a7'} // Sepolia chain ID in hex
+            {'chainId': '0xaa36a7'}
           ],
         ),
       );
       return true;
     } catch (e) {
       print('Failed to switch network: $e');
-      
-      // Try to add the network if it doesn't exist
+
       if (e.toString().contains('4902')) {
         return await _addSepoliaNetwork();
       }
-      
+
       return false;
     }
   }
 
-  /// Add Sepolia network
   Future<bool> _addSepoliaNetwork() async {
     if (_web3App == null || _currentSession == null) {
       return false;
@@ -229,7 +208,7 @@ class WalletService {
       await _web3App!.request(
         topic: _currentSession!,
         chainId: 'eip155:11155111',
-        request: SessionRequestParams(
+        request: const SessionRequestParams(
           method: 'wallet_addEthereumChain',
           params: [
             {
@@ -253,9 +232,10 @@ class WalletService {
     }
   }
 
-  /// Sign a message
   Future<String?> signMessage(String message) async {
-    if (_web3App == null || _currentSession == null || _currentAddress == null) {
+    if (_web3App == null ||
+        _currentSession == null ||
+        _currentAddress == null) {
       return null;
     }
 
@@ -276,9 +256,10 @@ class WalletService {
     }
   }
 
-  /// Sign typed data (EIP-712)
   Future<String?> signTypedData(Map<String, dynamic> typedData) async {
-    if (_web3App == null || _currentSession == null || _currentAddress == null) {
+    if (_web3App == null ||
+        _currentSession == null ||
+        _currentAddress == null) {
       return null;
     }
 
@@ -299,7 +280,6 @@ class WalletService {
     }
   }
 
-  // Event handlers
   void _onSessionEvent(SessionEvent? event) {
     print('Session event: ${event?.name}');
   }
@@ -322,4 +302,3 @@ class WalletService {
     _web3App?.onSessionDelete.unsubscribe(_onSessionDelete);
   }
 }
-
