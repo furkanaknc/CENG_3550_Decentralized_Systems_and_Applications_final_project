@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart';
 import 'pickup_request_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   final AuthService _auth = AuthService();
+  final LocationService _location = LocationService();
   final http.Client _client = http.Client();
   bool _loading = true;
   List<RecyclingPoint> _points = const [];
@@ -29,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   static const double _maxZoom = 18;
   static const double _zoomStep = 1.2;
   bool _showWebHint = kIsWeb;
+  bool _isSelectingLocation = false;
 
   bool get _isAdmin => _auth.currentUser?.isAdmin ?? false;
 
@@ -40,12 +43,24 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPoints();
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    if (!_isAdmin) {
+      await _location.getCurrentLocation();
+    }
+    await _loadPoints();
   }
 
   Future<void> _loadPoints() async {
     try {
-      final points = await ApiService().fetchRecyclingPoints(showAll: _isAdmin);
+      final points = await ApiService().fetchRecyclingPoints(
+        showAll: _isAdmin,
+        latitude: _location.latitude,
+        longitude: _location.longitude,
+        radiusKm: 15,
+      );
       if (!mounted) {
         return;
       }
@@ -79,6 +94,21 @@ class _MapScreenState extends State<MapScreen> {
       _loading = true;
       _errorMessage = null;
     });
+    await _loadPoints();
+  }
+
+  void _setUserLocation(LatLng point) async {
+    await _location.setManualLocation(point.latitude, point.longitude);
+    setState(() {
+      _isSelectingLocation = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            '📍 Konumunuz ayarlandı: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}'),
+        backgroundColor: Colors.green,
+      ),
+    );
     await _loadPoints();
   }
 
@@ -311,9 +341,35 @@ class _MapScreenState extends State<MapScreen> {
         )
         .toList();
 
-    final initialCenter = _points.isNotEmpty
-        ? LatLng(_points.first.latitude, _points.first.longitude)
-        : const LatLng(39.0, 35.0);
+    // Add user location marker (blue)
+    if (!_isAdmin && _location.currentPosition != null) {
+      markers.add(
+        Marker(
+          width: 60,
+          height: 60,
+          point: LatLng(_location.latitude, _location.longitude),
+          alignment: Alignment.center,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.3),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.blue, width: 2),
+            ),
+            child: const Icon(
+              Icons.my_location,
+              color: Colors.blue,
+              size: 24,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final initialCenter = _location.currentPosition != null && !_isAdmin
+        ? LatLng(_location.latitude, _location.longitude)
+        : _points.isNotEmpty
+            ? LatLng(_points.first.latitude, _points.first.longitude)
+            : const LatLng(39.0, 35.0);
 
     final hasSelection = _selectedPoint != null;
 
@@ -327,11 +383,15 @@ class _MapScreenState extends State<MapScreen> {
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
             ),
-            onTap: (_, __) {
-              setState(() {
-                _selectedPoint = null;
-                _showWebHint = false;
-              });
+            onTap: (_, point) {
+              if (_isSelectingLocation && !_isAdmin) {
+                _setUserLocation(point);
+              } else {
+                setState(() {
+                  _selectedPoint = null;
+                  _showWebHint = false;
+                });
+              }
             },
             onLongPress: _isAdmin
                 ? (tapPosition, point) => _showAddLocationDialog(point)
@@ -346,6 +406,56 @@ class _MapScreenState extends State<MapScreen> {
             MarkerLayer(markers: markers),
           ],
         ),
+        // Location selection mode indicator
+        if (_isSelectingLocation)
+          Positioned(
+            top: 80,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade700,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.touch_app, color: Colors.white),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Haritaya dokunarak konumunuzu seçin',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () =>
+                        setState(() => _isSelectingLocation = false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        // Location selection FAB (for non-admins)
+        if (!_isAdmin)
+          Positioned(
+            bottom: 24,
+            left: 16,
+            child: FloatingActionButton.small(
+              heroTag: 'location_fab',
+              backgroundColor:
+                  _isSelectingLocation ? Colors.orange : Colors.blue,
+              onPressed: () {
+                setState(() => _isSelectingLocation = !_isSelectingLocation);
+              },
+              child: Icon(
+                _isSelectingLocation ? Icons.close : Icons.my_location,
+                color: Colors.white,
+              ),
+            ),
+          ),
         if (_points.isNotEmpty)
           Positioned(
             left: 0,
