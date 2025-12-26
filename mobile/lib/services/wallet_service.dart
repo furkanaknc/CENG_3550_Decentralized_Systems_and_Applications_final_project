@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletconnect_flutter_v2/walletconnect_flutter_v2.dart';
 
@@ -86,31 +85,27 @@ class WalletService {
         },
       );
 
-      print('📝 Session received: ${session?.topic}');
+      print('📝 Session received: ${session.topic}');
 
-      if (session != null) {
-        _currentSession = session.topic;
+      _currentSession = session.topic;
 
-        final accounts = session.namespaces['eip155']?.accounts ?? [];
-        print('📋 Accounts: $accounts');
+      final accounts = session.namespaces['eip155']?.accounts ?? [];
+      print('📋 Accounts: $accounts');
 
-        if (accounts.isNotEmpty) {
-          final parts = accounts.first.split(':');
-          _currentAddress = parts.last.toLowerCase();
+      if (accounts.isNotEmpty) {
+        final parts = accounts.first.split(':');
+        _currentAddress = parts.last.toLowerCase();
 
-          print('✅ Connected address: $_currentAddress');
+        print('✅ Connected address: $_currentAddress');
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('wallet_address', _currentAddress!);
-          await prefs.setString('wallet_session', _currentSession!);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('wallet_address', _currentAddress!);
+        await prefs.setString('wallet_session', _currentSession!);
 
-          _addressController.add(_currentAddress);
-          return _currentAddress;
-        } else {
-          print('❌ No accounts in session');
-        }
+        _addressController.add(_currentAddress);
+        return _currentAddress;
       } else {
-        print('❌ Session is null');
+        print('❌ No accounts in session');
       }
 
       return null;

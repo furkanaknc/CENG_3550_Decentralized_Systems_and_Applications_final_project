@@ -41,7 +41,7 @@ class AuthService {
 
   final WalletService _wallet = WalletService();
   final http.Client _client = http.Client();
-  
+
   User? _currentUser;
   String? _cachedWalletAddress;
 
@@ -53,13 +53,10 @@ class AuthService {
     return apiUrl.replaceAll(RegExp(r'/+$'), '');
   }
 
-  /// Login with WalletConnect - returns ConnectResponse for UI
   Future<dynamic> loginWithWallet() async {
     try {
-      // Initialize WalletConnect
       await _wallet.init();
-      
-      // Create session and return response for QR display
+
       return await _wallet.createSession();
     } catch (e) {
       print('Login error: $e');
@@ -67,21 +64,18 @@ class AuthService {
     }
   }
 
-  /// Complete login after wallet approval
   Future<User?> completeLogin(dynamic connectResponse) async {
     try {
       print('🔄 Starting completeLogin...');
-      
-      // Wait for wallet approval
+
       final address = await _wallet.waitForConnection(connectResponse);
-      
+
       print('📍 Address received: $address');
-      
+
       if (address == null) {
         throw Exception('Cüzdan bağlantısı başarısız');
       }
 
-      // Try to switch to Sepolia network (don't fail if it doesn't work)
       try {
         print('🔄 Switching to Sepolia...');
         await _wallet.switchToSepolia();
@@ -90,7 +84,6 @@ class AuthService {
         print('⚠️ Network switch failed (continuing anyway): $e');
       }
 
-      // Call backend login endpoint
       final response = await _client.post(
         Uri.parse('$_baseUrl/api/auth/login'),
         headers: {
@@ -106,11 +99,10 @@ class AuthService {
         final userData = data['user'] as Map<String, dynamic>;
         _currentUser = User.fromJson(userData);
         _cachedWalletAddress = address;
-        
-        // Save to local storage
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_data', jsonEncode(userData));
-        
+
         return _currentUser;
       } else {
         throw Exception('Login failed: ${response.body}');
@@ -121,28 +113,57 @@ class AuthService {
     }
   }
 
-  /// Restore session from local storage
+  Future<User?> loginWithAddress(String address) async {
+    try {
+      print('🦊 Logging in with MetaMask address: $address');
+
+      final response = await _client.post(
+        Uri.parse('$_baseUrl/api/auth/login'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'walletAddress': address,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final userData = data['user'] as Map<String, dynamic>;
+        _currentUser = User.fromJson(userData);
+        _cachedWalletAddress = address;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_data', jsonEncode(userData));
+        await prefs.setString('wallet_address', address);
+
+        print('✅ MetaMask login successful: ${_currentUser?.name}');
+        return _currentUser;
+      } else {
+        throw Exception('Login failed: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ MetaMask login error: $e');
+      rethrow;
+    }
+  }
+
   Future<User?> restoreSession() async {
     try {
-      // Initialize WalletConnect
       await _wallet.init();
-      
-      // Try to restore wallet connection
       final address = await _wallet.restoreSession();
-      
+
       if (address == null) {
         return null;
       }
 
-      // Try to restore user data from local storage
       final prefs = await SharedPreferences.getInstance();
       final userDataString = prefs.getString('user_data');
-      
+
       if (userDataString != null) {
         final userData = jsonDecode(userDataString) as Map<String, dynamic>;
         final savedAddress = userData['walletAddress'] as String?;
-        
-        // Verify address matches
+
         if (savedAddress?.toLowerCase() == address.toLowerCase()) {
           _currentUser = User.fromJson(userData);
           _cachedWalletAddress = address;
@@ -150,7 +171,6 @@ class AuthService {
         }
       }
 
-      // If no saved data or address mismatch, return null
       return null;
     } catch (e) {
       print('Failed to restore session: $e');
@@ -158,7 +178,6 @@ class AuthService {
     }
   }
 
-  /// Get profile from backend
   Future<User?> getProfile() async {
     if (_cachedWalletAddress == null) {
       return null;
@@ -186,7 +205,6 @@ class AuthService {
     }
   }
 
-  /// Logout
   Future<void> logout() async {
     await _wallet.disconnect();
     _currentUser = null;
@@ -196,10 +214,8 @@ class AuthService {
     await prefs.remove('user_data');
   }
 
-  /// Get current wallet address
   String? get walletAddress => _cachedWalletAddress ?? _wallet.currentAddress;
 
-  /// Get auth headers for API requests
   Map<String, String> getAuthHeaders() {
     final address = walletAddress;
     if (address == null) {
@@ -210,4 +226,3 @@ class AuthService {
     };
   }
 }
-
