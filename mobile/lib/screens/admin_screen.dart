@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -21,6 +22,7 @@ class _AdminScreenState extends State<AdminScreen>
   List<dynamic>? _users;
   List<dynamic>? _pickups;
   Map<String, dynamic>? _materials;
+  List<Coupon>? _coupons;
   bool _loading = true;
   String? _error;
 
@@ -38,7 +40,7 @@ class _AdminScreenState extends State<AdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadDashboard();
   }
 
@@ -97,7 +99,7 @@ class _AdminScreenState extends State<AdminScreen>
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Kullanıcılar yüklenemedi: $e')),
+        SnackBar(content: Text('Failed to load users: $e')),
       );
     }
   }
@@ -117,7 +119,7 @@ class _AdminScreenState extends State<AdminScreen>
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Talepler yüklenemedi: $e')),
+        SnackBar(content: Text('Failed to load pickups: $e')),
       );
     }
   }
@@ -137,7 +139,30 @@ class _AdminScreenState extends State<AdminScreen>
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Materyaller yüklenemedi: $e')),
+        SnackBar(content: Text('Failed to load materials: $e')),
+      );
+    }
+  }
+
+  Future<void> _loadCoupons() async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$_baseUrl/api/admin/coupons'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final coupons = (data['coupons'] as List<dynamic>?) ?? [];
+        setState(() {
+          _coupons = coupons
+              .map((c) => Coupon.fromJson(c as Map<String, dynamic>))
+              .toList();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load coupons: $e')),
       );
     }
   }
@@ -152,19 +177,19 @@ class _AdminScreenState extends State<AdminScreen>
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Rol güncellendi')),
+          const SnackBar(content: Text('Role updated')),
         );
         _loadUsers();
       } else if (response.statusCode == 403) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kendi rolünüzü değiştiremezsiniz')),
+          const SnackBar(content: Text('Cannot change your own role')),
         );
       } else {
         throw Exception('Failed to update role');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Rol güncellenemedi: $e')),
+        SnackBar(content: Text('Failed to update role: $e')),
       );
     }
   }
@@ -174,18 +199,18 @@ class _AdminScreenState extends State<AdminScreen>
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning, color: Colors.red, size: 48),
-        title: const Text('Kullanıcıyı Sil'),
+        title: const Text('Delete User'),
         content: Text(
-            '"${user['name']}" kullanıcısını silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.'),
+            'Are you sure you want to delete "${user['name']}"?\n\nThis action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -206,7 +231,7 @@ class _AdminScreenState extends State<AdminScreen>
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ "$userName" silindi'),
+            content: Text('✅ "$userName" deleted'),
             backgroundColor: Colors.green,
           ),
         );
@@ -216,7 +241,7 @@ class _AdminScreenState extends State<AdminScreen>
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Silinemedi: $e')),
+        SnackBar(content: Text('❌ Delete failed: $e')),
       );
     }
   }
@@ -231,10 +256,10 @@ class _AdminScreenState extends State<AdminScreen>
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text('${material.toUpperCase()} çarpanı güncelleniyor...'),
+            Text('Updating ${material.toUpperCase()} multiplier...'),
             const SizedBox(height: 8),
             const Text(
-              '⛓️ Blockchain işlemi devam ediyor\nBu işlem 10-30 saniye sürebilir',
+              '⛓️ Blockchain transaction in progress\nThis may take 10-30 seconds',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
@@ -260,12 +285,12 @@ class _AdminScreenState extends State<AdminScreen>
           context: context,
           builder: (context) => AlertDialog(
             icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
-            title: const Text('Başarılı!'),
+            title: const Text('Success!'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${material.toUpperCase()} çarpanı güncellendi.'),
+                Text('${material.toUpperCase()} multiplier updated.'),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -276,7 +301,7 @@ class _AdminScreenState extends State<AdminScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('📦 Yeni Çarpan: ${weight}x',
+                      Text('📦 New Multiplier: ${weight}x',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text(
@@ -288,8 +313,8 @@ class _AdminScreenState extends State<AdminScreen>
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '💡 Bu değişiklik artık blockchain üzerinde geçerli. '
-                  'Yeni geri dönüşümler bu çarpanla hesaplanacak.',
+                  '💡 This change is now active on blockchain. '
+                  'New recycling will use this multiplier.',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -297,7 +322,7 @@ class _AdminScreenState extends State<AdminScreen>
             actions: [
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Tamam'),
+                child: const Text('OK'),
               ),
             ],
           ),
@@ -305,7 +330,7 @@ class _AdminScreenState extends State<AdminScreen>
 
         _loadMaterials();
       } else {
-        throw Exception('Sunucu hatası: ${response.statusCode}');
+        throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
       Navigator.pop(context);
@@ -314,17 +339,119 @@ class _AdminScreenState extends State<AdminScreen>
         context: context,
         builder: (context) => AlertDialog(
           icon: const Icon(Icons.error, color: Colors.red, size: 48),
-          title: const Text('Hata!'),
-          content: Text('Çarpan güncellenemedi:\n$e'),
+          title: const Text('Error!'),
+          content: Text('Failed to update multiplier:\n$e'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Kapat'),
+              child: const Text('Close'),
             ),
           ],
         ),
       );
     }
+  }
+
+  Future<void> _deleteCoupon(Coupon coupon) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Coupon'),
+        content: Text('Are you sure you want to delete "${coupon.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await _client.delete(
+        Uri.parse('$_baseUrl/api/admin/coupons/${coupon.id}'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Coupon deleted'), backgroundColor: Colors.green),
+        );
+        _loadCoupons();
+      } else {
+        throw Exception('Failed to delete coupon');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _updateCouponPointCost(Coupon coupon, int newPointCost) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('$_baseUrl/api/admin/coupons/${coupon.id}'),
+        headers: _headers,
+        body: jsonEncode({'pointCost': newPointCost}),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Coupon updated'), backgroundColor: Colors.green),
+        );
+        _loadCoupons();
+      } else {
+        throw Exception('Failed to update coupon');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  void _showEditCouponDialog(Coupon coupon) {
+    final controller = TextEditingController(text: coupon.pointCost.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit ${coupon.name}'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Point Cost',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newCost = int.tryParse(controller.text);
+              if (newCost != null && newCost > 0) {
+                Navigator.pop(context);
+                _updateCouponPointCost(coupon, newCost);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -335,16 +462,19 @@ class _AdminScreenState extends State<AdminScreen>
           TabBar(
             controller: _tabController,
             labelColor: Colors.green.shade700,
+            isScrollable: true,
             tabs: const [
               Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
-              Tab(icon: Icon(Icons.people), text: 'Kullanıcılar'),
-              Tab(icon: Icon(Icons.local_shipping), text: 'Talepler'),
-              Tab(icon: Icon(Icons.token), text: 'Ödüller'),
+              Tab(icon: Icon(Icons.people), text: 'Users'),
+              Tab(icon: Icon(Icons.local_shipping), text: 'Pickups'),
+              Tab(icon: Icon(Icons.token), text: 'Rewards'),
+              Tab(icon: Icon(Icons.card_giftcard), text: 'Coupons'),
             ],
             onTap: (index) {
               if (index == 1 && _users == null) _loadUsers();
               if (index == 2 && _pickups == null) _loadPickups();
               if (index == 3 && _materials == null) _loadMaterials();
+              if (index == 4 && _coupons == null) _loadCoupons();
             },
           ),
           Expanded(
@@ -355,6 +485,7 @@ class _AdminScreenState extends State<AdminScreen>
                 _buildUsersTab(),
                 _buildPickupsTab(),
                 _buildMaterialsTab(),
+                _buildCouponsTab(),
               ],
             ),
           ),
@@ -373,10 +504,10 @@ class _AdminScreenState extends State<AdminScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Hata: $_error'),
+            Text('Error: $_error'),
             ElevatedButton(
               onPressed: _loadDashboard,
-              child: const Text('Yeniden Dene'),
+              child: const Text('Retry'),
             ),
           ],
         ),
@@ -384,7 +515,7 @@ class _AdminScreenState extends State<AdminScreen>
     }
 
     if (_stats == null) {
-      return const Center(child: Text('Veri yok'));
+      return const Center(child: Text('No data'));
     }
 
     final users = _stats!['users'] as Map<String, dynamic>;
@@ -397,39 +528,39 @@ class _AdminScreenState extends State<AdminScreen>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildSectionTitle('Kullanıcı İstatistikleri'),
+          _buildSectionTitle('User Statistics'),
           Row(
             children: [
-              _buildStatCard('Toplam', users['total'].toString(), Icons.people),
+              _buildStatCard('Total', users['total'].toString(), Icons.people),
               _buildStatCard(
                   'User', users['byRole']['user'].toString(), Icons.person),
-              _buildStatCard('Kurye', users['byRole']['courier'].toString(),
+              _buildStatCard('Courier', users['byRole']['courier'].toString(),
                   Icons.delivery_dining),
               _buildStatCard('Admin', users['byRole']['admin'].toString(),
                   Icons.admin_panel_settings),
             ],
           ),
           const SizedBox(height: 24),
-          _buildSectionTitle('Pickup İstatistikleri'),
+          _buildSectionTitle('Pickup Statistics'),
           Row(
             children: [
               _buildStatCard(
-                  'Toplam', pickups['total'].toString(), Icons.recycling),
+                  'Total', pickups['total'].toString(), Icons.recycling),
               _buildStatCard(
-                  'Bekleyen', pickups['pending'].toString(), Icons.pending),
+                  'Pending', pickups['pending'].toString(), Icons.pending),
               _buildStatCard(
-                  'Atanmış', pickups['assigned'].toString(), Icons.assignment),
-              _buildStatCard('Tamamlanan', pickups['completed'].toString(),
+                  'Assigned', pickups['assigned'].toString(), Icons.assignment),
+              _buildStatCard('Completed', pickups['completed'].toString(),
                   Icons.check_circle),
             ],
           ),
           const SizedBox(height: 24),
-          _buildSectionTitle('Kurye Durumu'),
+          _buildSectionTitle('Courier Status'),
           Row(
             children: [
               _buildStatCard(
-                  'Toplam', couriers['total'].toString(), Icons.local_shipping),
-              _buildStatCard('Aktif', couriers['active'].toString(),
+                  'Total', couriers['total'].toString(), Icons.local_shipping),
+              _buildStatCard('Active', couriers['active'].toString(),
                   Icons.online_prediction),
             ],
           ),
@@ -447,12 +578,12 @@ class _AdminScreenState extends State<AdminScreen>
               ),
               title: Text(
                 blockchain['blockchainConfigured'] == true
-                    ? 'Blockchain Bağlı'
-                    : 'Blockchain Bağlı Değil',
+                    ? 'Blockchain Connected'
+                    : 'Blockchain Not Connected',
               ),
               subtitle: Text(
-                'On-chain Pickup: ${blockchain['totalPickups']}\n'
-                'Dağıtılan Ödül: ${blockchain['totalRewardsDistributed']} GRT',
+                'On-chain Pickups: ${blockchain['totalPickups']}\n'
+                'Rewards Distributed: ${blockchain['totalRewardsDistributed']} GRT',
               ),
             ),
           ),
@@ -482,12 +613,12 @@ class _AdminScreenState extends State<AdminScreen>
               title: Text(user['name']),
               subtitle: Text(
                 '${user['walletAddress']?.substring(0, 10)}...\n'
-                'Rol: ${user['role']} | Puan: ${user['greenPoints']}',
+                'Role: ${user['role']} | Points: ${user['greenPoints']}',
               ),
               isThreeLine: true,
               trailing: _isCurrentUser(user['id'])
                   ? const Chip(
-                      label: Text('Sen'),
+                      label: Text('You'),
                       backgroundColor: Colors.purple,
                       labelStyle: TextStyle(color: Colors.white, fontSize: 12),
                     )
@@ -495,21 +626,21 @@ class _AdminScreenState extends State<AdminScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         PopupMenuButton<String>(
-                          tooltip: 'Rol Değiştir',
+                          tooltip: 'Change Role',
                           onSelected: (role) =>
                               _updateUserRole(user['id'], role),
                           itemBuilder: (context) => [
                             const PopupMenuItem(
                                 value: 'user', child: Text('User')),
                             const PopupMenuItem(
-                                value: 'courier', child: Text('Kurye')),
+                                value: 'courier', child: Text('Courier')),
                             const PopupMenuItem(
                                 value: 'admin', child: Text('Admin')),
                           ],
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: 'Sil',
+                          tooltip: 'Delete',
                           onPressed: () => _confirmDeleteUser(user),
                         ),
                       ],
@@ -541,8 +672,8 @@ class _AdminScreenState extends State<AdminScreen>
               ),
               title: Text('${pickup['material']} - ${pickup['weightKg']} kg'),
               subtitle: Text(
-                'Kullanıcı: ${pickup['userName']}\n'
-                'Durum: ${pickup['status']}',
+                'User: ${pickup['userName']}\n'
+                'Status: ${pickup['status']}',
               ),
               isThreeLine: true,
             ),
@@ -563,12 +694,12 @@ class _AdminScreenState extends State<AdminScreen>
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Materyal Ödül Çarpanları (Blockchain)',
+            'Material Reward Multipliers (Blockchain)',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Her kg için kazanılan token = ağırlık × çarpan',
+            'Tokens earned per kg = weight × multiplier',
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 16),
@@ -577,7 +708,7 @@ class _AdminScreenState extends State<AdminScreen>
               child: ListTile(
                 leading: Icon(_getMaterialIcon(entry.key)),
                 title: Text(entry.key.toUpperCase()),
-                subtitle: Text('Çarpan: ${entry.value}x'),
+                subtitle: Text('Multiplier: ${entry.value}x'),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () =>
@@ -591,24 +722,99 @@ class _AdminScreenState extends State<AdminScreen>
     );
   }
 
+  Widget _buildCouponsTab() {
+    if (_coupons == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_coupons!.isEmpty) {
+      return const Center(child: Text('No coupons available'));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadCoupons,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _coupons!.length,
+        itemBuilder: (context, index) {
+          final coupon = _coupons![index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: coupon.isActive ? Colors.green[50] : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    coupon.displayDiscount,
+                    style: TextStyle(
+                      color: coupon.isActive ? Colors.green[700] : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              title: Row(
+                children: [
+                  Expanded(child: Text(coupon.name)),
+                  if (!coupon.isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red[100],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Inactive',
+                          style: TextStyle(fontSize: 10, color: Colors.red)),
+                    ),
+                ],
+              ),
+              subtitle: Text('${coupon.partner} • ${coupon.pointCost} points'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _showEditCouponDialog(coupon),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteCoupon(coupon),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showEditMaterialDialog(String material, int currentWeight) {
     final controller = TextEditingController(text: currentWeight.toString());
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${material.toUpperCase()} Çarpanı'),
+        title: Text('${material.toUpperCase()} Multiplier'),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: 'Yeni çarpan değeri (0-255)',
+            labelText: 'New multiplier value (0-255)',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -618,7 +824,7 @@ class _AdminScreenState extends State<AdminScreen>
                 _updateMaterialWeight(material, newWeight);
               }
             },
-            child: const Text('Güncelle'),
+            child: const Text('Update'),
           ),
         ],
       ),
