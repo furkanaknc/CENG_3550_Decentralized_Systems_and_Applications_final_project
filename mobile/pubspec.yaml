@@ -1,0 +1,27 @@
+name: green_cycle
+version: 0.1.0
+publish_to: "none"
+description: Mobile client for courier-assisted recycling pickups and rewards
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+dependencies:
+  flutter_dotenv: ^5.1.0
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+  web3dart: ^2.7.3
+  shared_preferences: ^2.2.2
+  walletconnect_flutter_v2: ^2.1.15
+  url_launcher: ^6.2.5
+  qr_flutter: ^4.1.0
+  js: ^0.7.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - .env

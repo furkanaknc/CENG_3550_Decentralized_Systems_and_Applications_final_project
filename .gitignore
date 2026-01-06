@@ -1,0 +1,17 @@
+*node_modules/
+*.log
+dist/
+.env
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.bak
+coverage/
+*.tmp
+*.old
+*.cache
+*build/
+*.dart_tool/
+.flutter-sdk/
+md/
