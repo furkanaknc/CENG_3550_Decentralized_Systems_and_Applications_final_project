@@ -1,234 +1,580 @@
-# 🌱 Green Cycle - Blockchain Tabanlı Geri Dönüşüm Platformu
+# 🌱 Green Cycle - Blockchain-Based Recycling Platform
 
-Bu proje, MetaMask cüzdan entegrasyonu, kurye yönetimi, harita tabanlı takip ve blockchain ödül sistemi içeren sürdürülebilir bir geri dönüşüm platformudur.
+A sustainable recycling platform with MetaMask wallet integration, courier management, map-based tracking, blockchain rewards, and a coupon system.
 
-## ✨ Özellikler
+## ✨ Features
 
-- 🦊 **MetaMask ile Kimlik Doğrulama**: Şifresiz, blockchain tabanlı güvenli giriş
-- 👥 **Rol Bazlı Yetkilendirme**: User, Courier ve Admin rolleri
-- 🚚 **Kurye Yönetimi**: Gerçek zamanlı talep kabul ve tamamlama
-- 📍 **Harita Entegrasyonu**: OpenStreetMap ile geri dönüşüm noktaları
-- ⛓️ **Smart Contract**: Ethereum Sepolia test ağında çalışan pickup yönetimi
-- 🎁 **Ödül Sistemi**: Geri dönüşüm aktivitelerine göre token kazanımı
-- 📱 **Flutter Web**: Chrome tarayıcı üzerinde çalışan modern UI
+- 🦊 **MetaMask Authentication**: Passwordless, blockchain-based secure login
+- 👥 **Role-Based Authorization**: User, Courier, and Admin roles
+- 🚚 **Courier Management**: Real-time pickup request acceptance and completion
+- 📍 **Map Integration**: OpenStreetMap with recycling point locations
+- ⛓️ **Smart Contracts**: Pickup management running on Ethereum Sepolia testnet
+- 🎁 **Reward System**: ERC-20 token rewards for recycling activities
+- 🎟️ **Coupon System**: Redeem green points for partner coupons
+- 📱 **Flutter Web**: Modern UI running on Chrome browser
 
-## 📁 Proje Yapısı
+## 📁 Project Structure
 
-- `backend/`: Node.js (TypeScript) REST API servisi
-  - Wallet tabanlı kimlik doğrulama
-  - Rol bazlı yetkilendirme middleware
-  - Kurye atama ve pickup yönetimi
-  - PostgreSQL veritabanı
-  
-- `blockchain/`: Hardhat blockchain projesi
-  - `GreenReward.sol`: ERC-20 ödül token kontratı
-  - `PickupManager.sol`: Pickup yönetimi ve kurye atama kontratı
-  - Sepolia test network desteği
-  
-- `mobile/`: Flutter web uygulaması
-  - MetaMask entegrasyonu
-  - Login/logout sistemi
-  - Kullanıcı ve kurye arayüzleri
-  - Web3 blockchain etkileşimi
+```
+blockchain-project/
+├── backend/          # Node.js (TypeScript) REST API
+├── blockchain/       # Hardhat smart contracts (Solidity)
+├── mobile/           # Flutter web application
+└── scripts/          # Utility scripts
+```
 
-## 🚀 Hızlı Başlangıç
+---
 
-### Gereksinimler
+# 🔧 Backend
 
-- Node.js 18+ ve npm
-- Docker ve Docker Compose
-- Flutter SDK 3.3.0+
-- Chrome tarayıcı
-- MetaMask eklentisi
+The backend is a Node.js/TypeScript REST API that handles authentication, pickup management, courier operations, and blockchain integration.
 
-### 1. Backend Kurulumu
+## Tech Stack
+
+- **Runtime**: Node.js 18+
+- **Language**: TypeScript
+- **Framework**: Express.js
+- **Database**: PostgreSQL
+- **Blockchain**: ethers.js (v6)
+
+## Directory Structure
+
+```
+backend/
+├── src/
+│   ├── controllers/     # Request handlers
+│   ├── db/              # Database client & migrations
+│   ├── jobs/            # Background workers
+│   ├── middleware/      # Auth & role middleware
+│   ├── models/          # TypeScript interfaces
+│   ├── repositories/    # Database queries
+│   ├── routes/          # API route definitions
+│   ├── services/        # Business logic
+│   └── utils/           # Helper functions
+├── db/migrations/       # SQL migration files
+├── tests/               # Jest test files
+└── docker-compose.yml   # PostgreSQL container
+```
+
+## Database Tables
+
+| Table                 | Description                                   |
+| --------------------- | --------------------------------------------- |
+| `users`               | User accounts with wallet addresses and roles |
+| `couriers`            | Courier information and current locations     |
+| `pickups`             | Pickup requests with status and location      |
+| `recycling_locations` | Recycling center locations                    |
+| `carbon_reports`      | Carbon savings reports                        |
+| `coupons`             | Available coupons with point costs            |
+| `user_coupons`        | User-purchased coupons with codes             |
+
+## API Endpoints
+
+### Authentication
+
+| Method | Endpoint            | Description               |
+| ------ | ------------------- | ------------------------- |
+| POST   | `/api/auth/login`   | Login with wallet address |
+| GET    | `/api/auth/profile` | Get user profile          |
+
+### Pickups
+
+| Method | Endpoint       | Description           |
+| ------ | -------------- | --------------------- |
+| POST   | `/api/pickups` | Create pickup request |
+| GET    | `/api/pickups` | List all pickups      |
+
+### Couriers
+
+| Method | Endpoint                             | Description                    |
+| ------ | ------------------------------------ | ------------------------------ |
+| GET    | `/api/couriers/pickups/pending`      | Get pending pickups            |
+| GET    | `/api/couriers/my-pickups`           | Get assigned pickups           |
+| POST   | `/api/couriers/pickups/:id/accept`   | Accept a pickup                |
+| POST   | `/api/couriers/pickups/:id/complete` | Complete a pickup              |
+| GET    | `/api/couriers/nonce`                | Get courier's blockchain nonce |
+
+### Coupons
+
+| Method | Endpoint                    | Description                  |
+| ------ | --------------------------- | ---------------------------- |
+| GET    | `/api/coupons`              | List available coupons       |
+| POST   | `/api/coupons/:id/purchase` | Purchase coupon with points  |
+| GET    | `/api/coupons/my`           | Get user's purchased coupons |
+
+### Admin
+
+| Method | Endpoint                    | Description          |
+| ------ | --------------------------- | -------------------- |
+| GET    | `/api/admin/dashboard`      | Dashboard statistics |
+| GET    | `/api/admin/users`          | List all users       |
+| PATCH  | `/api/admin/users/:id/role` | Update user role     |
+| DELETE | `/api/admin/users/:id`      | Delete user          |
+| GET    | `/api/admin/coupons`        | List all coupons     |
+| POST   | `/api/admin/coupons`        | Create coupon        |
+| PATCH  | `/api/admin/coupons/:id`    | Update coupon        |
+| DELETE | `/api/admin/coupons/:id`    | Delete coupon        |
+
+### Maps & Analytics
+
+| Method | Endpoint           | Description                 |
+| ------ | ------------------ | --------------------------- |
+| GET    | `/api/maps/nearby` | Get nearby recycling points |
+| GET    | `/api/maps/all`    | Get all recycling points    |
+| GET    | `/api/analytics`   | Get user analytics & points |
+
+## Setup
+
 ```bash
 cd backend
 npm install
 
-# PostgreSQL veritabanını başlat
+# Start PostgreSQL
 docker compose up -d postgres
 
-# Database migration'ları çalıştır
+# Run migrations
 npm run migrate
 
-# Geliştirme sunucusunu başlat
+# Start development server
 npm run dev
 ```
 
-**Not:** Backend varsayılan olarak `http://localhost:4000` adresinde çalışır.
+Server runs on `http://localhost:4000`
 
-#### Blockchain entegrasyonu için ortam değişkenleri
+## Environment Variables
 
-Blockchain işlemlerini backend üzerinden tetiklemek için `backend/.env` dosyanıza aşağıdaki değerleri ekleyin:
+```env
+DATABASE_URL=postgresql://admin:secret@localhost:5432/recycle
+JWT_SECRET=your-secret-key
+
+# Blockchain Integration
+BLOCKCHAIN_RPC_URL=https://sepolia.infura.io/v3/<PROJECT_ID>
+BLOCKCHAIN_PRIVATE_KEY=0x<operator-private-key>
+PICKUP_MANAGER_ADDRESS=0x87E2d4e74aD436F80b885042b71CdfeC54E7DE68
+GREEN_REWARD_ADDRESS=0xd2F0f24694601c6836CA8944995B00FfE3288Ea0
+```
+
+---
+
+# ⛓️ Blockchain
+
+Smart contracts built with Hardhat, deployed on Ethereum Sepolia testnet.
+
+## Ethereum Standards Used
+
+This project implements several Ethereum Improvement Proposals (EIPs) and OpenZeppelin contracts:
+
+### ERC-20 (Token Standard)
+
+**Used in:** `GreenReward.sol`
+
+ERC-20 is the most widely used token standard on Ethereum. It defines a common interface for fungible tokens.
+
+| Function                         | Description                                   |
+| -------------------------------- | --------------------------------------------- |
+| `balanceOf(address)`             | Returns the token balance of an account       |
+| `transfer(to, amount)`           | Transfers tokens to another address           |
+| `approve(spender, amount)`       | Approves a spender to use tokens              |
+| `transferFrom(from, to, amount)` | Transfers tokens on behalf of another address |
+| `totalSupply()`                  | Returns total token supply                    |
+
+**In our project:** GRT (Green Reward Token) is minted when users complete recycling activities. The token can be viewed in MetaMask and potentially traded.
+
+---
+
+### EIP-712 (Typed Structured Data Signing)
+
+**Used in:** `PickupManager.sol`
+
+EIP-712 enables secure off-chain message signing with human-readable data. Instead of signing raw bytes, users see exactly what they're signing in MetaMask.
+
+**Why we use it:**
+
+- Couriers sign pickup acceptance/completion without paying gas
+- Backend can submit signatures on behalf of couriers
+- Prevents replay attacks with nonces and deadlines
+- User-friendly: MetaMask shows structured data instead of hex
+
+**Our Type Definitions:**
+
+```solidity
+bytes32 private constant ACCEPT_TYPEHASH =
+    keccak256("AcceptPickup(string pickupId,address courier,uint256 nonce,uint256 deadline)");
+
+bytes32 private constant COMPLETE_TYPEHASH =
+    keccak256("CompletePickup(string pickupId,address courier,uint256 nonce,uint256 deadline)");
+```
+
+**Flow:**
+
+1. Courier clicks "Accept Pickup" in mobile app
+2. MetaMask opens with human-readable message
+3. Courier signs the typed data
+4. Signature is sent to backend
+5. Backend submits to blockchain with `acceptPickupWithSig()`
+
+---
+
+### Ownable (Access Control)
+
+**Used in:** Both contracts
+
+OpenZeppelin's Ownable pattern restricts certain functions to the contract owner (deployer).
+
+| Modifier                      | Description                           |
+| ----------------------------- | ------------------------------------- |
+| `onlyOwner`                   | Only contract owner can call          |
+| `transferOwnership(newOwner)` | Transfer ownership to another address |
+| `renounceOwnership()`         | Permanently remove owner              |
+
+**Protected functions in our contracts:**
+
+- `GreenReward.setMaterialWeight()` - Only owner can change multipliers
+- `GreenReward.recordActivity()` - Only owner can mint tokens
+- `PickupManager.assignRole()` - Only owner can assign roles
+
+---
+
+### ECDSA (Elliptic Curve Digital Signature Algorithm)
+
+**Used in:** `PickupManager.sol`
+
+ECDSA is used to recover the signer's address from a signature. Combined with EIP-712, it enables gasless transactions.
+
+```solidity
+address signer = ECDSA.recover(digest, v, r, s);
+require(signer == courier, "Invalid courier signature");
+```
+
+**Security features:**
+
+- Nonce tracking prevents replay attacks
+- Deadline prevents stale signatures
+- Signature validation ensures authenticity
+
+---
+
+## Contracts
+
+### GreenReward.sol (ERC-20 Token)
+
+An ERC-20 token contract that rewards users for recycling activities.
+
+**Features:**
+
+- Material-based reward multipliers
+- Configurable weights by admin
+- Activity history tracking
+
+**Material Multipliers (Default):**
+| Material | Multiplier |
+|----------|------------|
+| Plastic | 10x |
+| Glass | 12x |
+| Paper | 8x |
+| Metal | 15x |
+| Electronics | 20x |
+
+**Reward Calculation:**
 
 ```
-BLOCKCHAIN_RPC_URL=https://sepolia.infura.io/v3/<PROJE_ID>
-BLOCKCHAIN_PRIVATE_KEY=0x<platform-operator-private-key>
-PICKUP_MANAGER_ADDRESS=0x<deployed-pickup-manager-address>
-GREEN_REWARD_ADDRESS=0x<deployed-green-reward-address>
+reward = weightKg × materialMultiplier
 ```
 
-> ⚠️ Private key bilgisinin sıcak cüzdanlarda saklanması önerilmez. Geliştirme ortamında ayrı bir operatör cüzdanı kullanın ve
-> `.env` dosyasını sürüm kontrolüne eklemeyin.
+**Key Functions:**
 
-Yeşil ödül kontratı, ağırlığı kilogramın %100'ü (ör: 1.5 kg → `150`) olarak kaydeder. Bu nedenle backend, zincire gönderilen
-verileri aynı ölçekte (×100) normalize eder.
+```solidity
+function setMaterialWeight(string material, uint8 weight) external onlyOwner
+function recordActivity(address user, string material, uint256 weightKg) external onlyOwner
+function getUserActivities(address user) external view returns (RecyclingActivity[])
+```
 
-#### Veritabanı Tabloları
+### PickupManager.sol
 
-Migration'lar aşağıdaki tabloları oluşturur:
+Manages pickup lifecycle and courier assignments on-chain with EIP-712 signature verification.
 
-- `users`: Kullanıcı bilgileri, wallet adresleri ve roller
-- `couriers`: Kurye bilgileri ve lokasyonları
-- `recycling_locations`: Geri dönüşüm merkezi lokasyonları
-- `pickups`: Toplama talepleri ve durumları
-- `carbon_reports`: Karbon tasarruf raporları
+**Pickup States:**
 
-### 2. Blockchain (Smart Contracts) Kurulumu
+```
+Pending → Assigned → Completed
+                  ↘ Cancelled
+```
+
+**User Roles:**
+| Role | Permissions |
+|------|-------------|
+| None | Default, auto-upgraded to User |
+| User | Create pickups |
+| Courier | Accept and complete pickups |
+| Admin | All permissions + role management |
+
+**Key Functions:**
+
+```solidity
+function createPickup(string pickupId, string material, uint256 weightKg) external
+function acceptPickup(string pickupId) external onlyCourier
+function acceptPickupWithSig(string pickupId, address courier, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external
+function completePickup(string pickupId) external onlyCourier
+function completePickupWithSig(string pickupId, address courier, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external
+function assignRole(address user, UserRole role) external onlyOwner
+```
+
+**Events:**
+
+```solidity
+event PickupCreated(bytes32 indexed pickupIdHash, string pickupId, address indexed user, string material, uint256 weightKg)
+event PickupAssigned(bytes32 indexed pickupIdHash, string pickupId, address indexed courier, uint256 timestamp)
+event PickupCompleted(bytes32 indexed pickupIdHash, string pickupId, address indexed courier, uint256 timestamp)
+event RoleAssigned(address indexed user, UserRole role)
+```
+
+## Setup
 
 ```bash
 cd blockchain
 npm install
 
-# Kontratları derle
+# Compile contracts
 npm run build
 
-# Testleri çalıştır
+# Run tests
 npm test
 
-# Sepolia test ağına deploy (opsiyonel)
-# Önce .env dosyasını oluştur ve private key ekle
+# Deploy to Sepolia
 npx hardhat run scripts/deploy-pickup-manager.ts --network sepolia
 ```
 
-**Sepolia Test Network için:**
-1. `.env` dosyası oluştur
-2. Private key'inizi ekleyin (test cüzdanı kullanın!)
-3. [Sepolia Faucet](https://sepoliafaucet.com/) ile test ETH alın
-4. Deploy scriptini çalıştırın
+## Environment Variables
 
-### 3. Frontend (Flutter Web) Kurulumu
+```env
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/<PROJECT_ID>
+PRIVATE_KEY=0x<deployer-private-key>
+```
+
+---
+
+# 📱 Mobile (Flutter Web)
+
+A Flutter web application with MetaMask and WalletConnect integration.
+
+## Tech Stack
+
+- **Framework**: Flutter 3.3+
+- **Language**: Dart
+- **Maps**: flutter_map (OpenStreetMap)
+- **Wallet**: MetaMask (web), WalletConnect (mobile)
+- **QR Codes**: qr_flutter
+
+## Screens
+
+| Screen                 | Description                              |
+| ---------------------- | ---------------------------------------- |
+| `LoginScreen`          | MetaMask/WalletConnect authentication    |
+| `MapScreen`            | Interactive map with recycling locations |
+| `PickupRequestScreen`  | Create new pickup requests               |
+| `RewardsScreen`        | View points, coupons, and purchases      |
+| `CourierPickupsScreen` | Courier-specific pickup management       |
+| `AdminScreen`          | Admin dashboard and management           |
+
+## Features by Role
+
+### 👤 User Role
+
+Users can create recycling pickup requests and earn green points.
+
+**Available Screens:**
+
+| Screen      | Features                                                                                                                                                                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Map**     | • View all recycling locations on interactive OpenStreetMap<br>• See location details (accepted materials)<br>• Find nearby recycling points                                                                                            |
+| **Pickup**  | • Select material type (plastic, glass, paper, metal, electronics)<br>• Enter weight in kg<br>• Add address details (neighborhood, district, city)<br>• Submit pickup request<br>• View nearby drop-off suggestions                     |
+| **Rewards** | • View current green points balance<br>• See total carbon savings (CO₂ kg)<br>• Browse available coupons with point costs<br>• Purchase coupons using points<br>• View purchased coupons with codes<br>• Copy coupon codes to clipboard |
+
+**Navigation Bar:** Map → Pickup → Rewards
+
+---
+
+### 🚚 Courier Role
+
+Couriers accept and complete pickup requests, earning on each delivery.
+
+**Available Screens:**
+
+| Screen       | Features                                                                                                                                                                                                                                                                                                       |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Requests** | • View all pending pickup requests<br>• See material type and weight<br>• See pickup address and location<br>• Accept pickup (triggers MetaMask EIP-712 signature)<br>• View accepted pickups in "My Pickups" tab<br>• Complete pickup (triggers blockchain transaction)<br>• Pull-to-refresh for new requests |
+| **Map**      | • View recycling locations<br>• See pickup locations on map                                                                                                                                                                                                                                                    |
+
+**Navigation Bar:** Requests → Map
+
+**Blockchain Integration:**
+
+- Accepting a pickup requires signing an EIP-712 typed message via MetaMask
+- Completing a pickup records the transaction on Sepolia blockchain
+- Courier nonce is tracked to prevent replay attacks
+
+---
+
+### 👑 Admin Role
+
+Admins have full platform control with a comprehensive dashboard.
+
+**Available Screens (5 Tabs):**
+
+| Tab           | Features                                                                                                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Dashboard** | • Total users count (by role: user/courier/admin)<br>• Pickup statistics (pending/assigned/completed)<br>• Active couriers count<br>• Blockchain connection status<br>• Total on-chain pickups<br>• Total rewards distributed (GRT tokens) |
+| **Users**     | • List all registered users<br>• See wallet addresses and green points<br>• Change user roles (user → courier → admin)<br>• Delete users (with confirmation)<br>• "You" badge for current admin                                            |
+| **Pickups**   | • View all pickup requests<br>• See status (pending/assigned/completed)<br>• See user name and material details                                                                                                                            |
+| **Rewards**   | • View material reward multipliers<br>• Edit multipliers (triggers blockchain transaction)<br>• See blockchain transaction confirmation<br>• Real-time multiplier updates on-chain                                                         |
+| **Coupons**   | • List all coupons (active/inactive)<br>• Edit coupon point costs<br>• Delete coupons<br>• See partner names and discount values                                                                                                           |
+
+**Navigation Bar:** Admin → Map
+
+**Admin-Only Actions:**
+
+- Change any user's role
+- Update blockchain material weights
+- Manage coupon catalog
+- View platform-wide statistics
+
+## Setup
 
 ```bash
 cd mobile
 flutter pub get
 
-# Web için çalıştır (Chrome)
+# Create .env file
+echo "API_BASE_URL=http://localhost:4000" > .env
+echo "PICKUP_MANAGER_ADDRESS=0x<contract-address>" >> .env
+
+# Run on Chrome
 flutter run -d chrome
 
-# Veya production build
+# Build for production
 flutter build web
 ```
 
-**Önemli:** `.env` dosyasını oluşturun:
+## Key Services
+
+| Service         | Description                           |
+| --------------- | ------------------------------------- |
+| `AuthService`   | Authentication and session management |
+| `ApiService`    | REST API communication                |
+| `WalletService` | WalletConnect integration             |
+| `metamask.dart` | MetaMask web3 integration             |
+
+---
+
+# 🚀 Quick Start
+
+## Prerequisites
+
+- Node.js 18+ and npm
+- Docker and Docker Compose
+- Flutter SDK 3.3.0+
+- Chrome browser
+- MetaMask browser extension
+
+## 1. Start Backend
+
 ```bash
-# mobile/.env
-API_BASE_URL=http://localhost:4000
+cd backend
+npm install
+docker compose up -d postgres
+npm run migrate
+npm run dev
 ```
 
-### 4. MetaMask Kurulumu
+## 2. Deploy Contracts (Optional)
 
-Detaylı MetaMask kurulum talimatları için [METAMASK_KULLANIM_KILAVUZU.md](METAMASK_KULLANIM_KILAVUZU.md) dosyasını okuyun.
+```bash
+cd blockchain
+npm install
+npm run build
+npx hardhat run scripts/deploy-pickup-manager.ts --network sepolia
+```
 
-**Hızlı Adımlar:**
-1. Chrome'a [MetaMask eklentisi](https://metamask.io/download/) yükleyin
-2. Yeni cüzdan oluşturun veya mevcut cüzdanı içe aktarın
-3. Sepolia Test Network ekleyin
-4. [Faucet](https://sepoliafaucet.com/) ile test ETH alın
-5. Green Cycle uygulamasına giriş yapın
+## 3. Start Frontend
 
-## 🔐 Kullanıcı Rolleri
+```bash
+cd mobile
+flutter pub get
+# Create .env with API_BASE_URL=http://localhost:4000
+flutter run -d chrome
+```
 
-### User (Kullanıcı)
-- Geri dönüşüm talepleri oluşturabilir
-- Haritada noktaları görüntüleyebilir
-- Ödül puanlarını takip edebilir
+## 4. MetaMask Setup
 
-### Courier (Kurye)
-- Bekleyen talepleri görüntüleyebilir
-- Talepleri kabul edebilir
-- Talepleri tamamlayabilir
+1. Install [MetaMask extension](https://metamask.io/download/)
+2. Create or import wallet
+3. Add Sepolia Test Network
+4. Get test ETH from [Sepolia Faucet](https://sepoliafaucet.com/)
+5. Connect to Green Cycle app
 
-### Admin (Yönetici)
-- Tüm yetkiler
-- Kullanıcı rollerini yönetebilir
-- Smart contract'ları yönetebilir
+---
 
-**Not:** İlk giriş yapan kullanıcılar otomatik olarak "user" rolü alır. Courier veya admin olmak için veritabanında manuel rol ataması gerekir.
+# 🔐 User Roles
 
-## 🧪 Test Kullanıcıları
+| Role        | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| **User**    | Create pickups, view map, earn points, purchase coupons |
+| **Courier** | Accept and complete pickups, blockchain signing         |
+| **Admin**   | Full access, user management, contract configuration    |
 
-Database migration'ları demo hesaplar oluşturur:
+First-time users are automatically assigned the "user" role. Courier or admin roles require manual assignment via the admin panel or database.
 
-- **Admin:** `0xAdminWalletAddressHere`
-- **Courier 1:** `0xCourierWallet1Here`
-- **Courier 2:** `0xCourierWallet2Here`
-- **User:** `0xUserWallet1Here`
+---
 
-**Not:** Bu demo adresleri üretim için geçerli değildir, backend çalıştıktan sonra gerçek MetaMask cüzdan adresleriyle değiştirin.
+# 🎟️ Coupon System
 
-## 🛠️ API Endpoints
+Users can redeem their green points for partner coupons:
 
-### Auth
-- `POST /api/auth/login` - MetaMask ile giriş
-- `GET /api/auth/profile` - Kullanıcı profili
+| Example Coupons | Partner   | Points |
+| --------------- | --------- | ------ |
+| 25₺ Gift Card   | BİM       | 400    |
+| Free Drink      | Starbucks | 450    |
+| 10% Discount    | Migros    | 500    |
+| 15% Discount    | Gratis    | 600    |
+| 50₺ Gift Card   | A101      | 750    |
+| 100₺ Discount   | Trendyol  | 1000   |
 
-### Pickups
-- `POST /api/pickups` - Yeni talep oluştur
-- `GET /api/pickups` - Tüm talepleri listele
+Admins can manage coupons (add, edit point costs, delete) via the admin panel.
 
-### Couriers
-- `GET /api/couriers` - Kuryeler listesi
-- `GET /api/couriers/pickups/pending` - Bekleyen talepler (courier)
-- `POST /api/couriers/pickups/:id/accept` - Talep kabul et (courier)
-- `POST /api/couriers/pickups/:id/complete` - Talep tamamla (courier)
+---
 
-### Maps
-- `GET /api/maps/nearby` - Yakındaki geri dönüşüm noktaları
+# 🐛 Troubleshooting
 
-### Analytics
-- `GET /api/analytics` - Kullanıcı istatistikleri
+### Backend connection error
 
-## 📚 Dokümantasyon
+- Ensure backend is running (`http://localhost:4000`)
+- Check PostgreSQL container is running
+- Verify `.env` connection settings
 
-- [MetaMask Kullanım Kılavuzu (Türkçe)](METAMASK_KULLANIM_KILAVUZU.md)
-- [Backend API Dokümantasyonu](backend/README.md)
-- [Smart Contract Dokümantasyonu](blockchain/README.md)
-- [Flutter Web Geliştirme Notları](mobile/README.md)
+### MetaMask not connecting
 
-## 🐛 Sorun Giderme
+- Verify MetaMask extension is installed
+- Ensure you're on Sepolia network
+- Check browser console for errors
 
-### Backend bağlantı hatası
-- Backend'in çalıştığından emin olun (`http://localhost:4000`)
-- PostgreSQL container'ının çalıştığından emin olun
-- `.env` dosyasında doğru bağlantı ayarları olduğunu kontrol edin
+### Smart contract error
 
-### MetaMask bağlanamıyor
-- MetaMask eklentisinin yüklü olduğunu kontrol edin
-- Sepolia ağında olduğunuzdan emin olun
-- Tarayıcı konsolunda hata mesajlarını kontrol edin
+- Ensure you have enough Sepolia test ETH
+- Verify contract addresses are correct
+- Check gas limit settings
 
-### Smart contract hatası
-- Sepolia ağında yeterli test ETH'iniz olduğundan emin olun
-- Contract adreslerinin doğru olduğunu kontrol edin
-- Gas limit ayarlarını kontrol edin
+---
 
-## 🤝 Katkıda Bulunma
+# 📄 License
 
-1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
-5. Pull Request açın
+This project is licensed under the MIT License.
 
-## 📄 Lisans
+---
 
-Bu proje MIT lisansı altında lisanslanmıştır.
+# 🙏 Acknowledgments
 
-## 🙏 Teşekkürler
-
-- OpenStreetMap topluluğu
-- Ethereum ve Sepolia test network
-- MetaMask ekibi
-- Flutter ve Dart ekibi
+- OpenStreetMap community
+- Ethereum and Sepolia testnet
+- MetaMask team
+- Flutter and Dart team
+- OpenZeppelin contracts
