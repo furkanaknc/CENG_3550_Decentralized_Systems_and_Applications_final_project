@@ -1,14 +1,17 @@
-import { query } from '../db/client';
-import { Coordinates, PickupRequest, RecyclingLocation } from '../models';
-import { findLocationById, upsertRecyclingLocation } from './recyclingLocationsRepository';
+import { query } from "../db/client";
+import { Coordinates, PickupRequest, RecyclingLocation } from "../models";
+import {
+  findLocationById,
+  upsertRecyclingLocation,
+} from "./recyclingLocationsRepository";
 
 type PickupRow = {
   id: string;
   user_id: string;
   courier_id: string | null;
-  material: PickupRequest['material'];
+  material: PickupRequest["material"];
   weight_kg: number;
-  status: PickupRequest['status'];
+  status: PickupRequest["status"];
   pickup_latitude: number;
   pickup_longitude: number;
   dropoff_location: string | null;
@@ -18,6 +21,11 @@ type PickupRow = {
   dropoff_latitude: number | null;
   dropoff_longitude: number | null;
   dropoff_accepted_materials: string[] | null;
+  neighborhood: string | null;
+  district: string | null;
+  city: string | null;
+  street: string | null;
+  building: string | null;
 };
 
 function mapPickup(row: PickupRow): PickupRequest {
@@ -30,15 +38,28 @@ function mapPickup(row: PickupRow): PickupRequest {
     status: row.status,
     pickupLocation: toCoordinates(row.pickup_latitude, row.pickup_longitude),
     createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString()
+    updatedAt: row.updated_at.toISOString(),
+    address: {
+      neighborhood: row.neighborhood ?? undefined,
+      district: row.district ?? undefined,
+      city: row.city ?? undefined,
+      street: row.street ?? undefined,
+      building: row.building ?? undefined,
+    },
   };
 
-  if (row.dropoff_location && row.dropoff_name && row.dropoff_latitude !== null && row.dropoff_longitude !== null) {
+  if (
+    row.dropoff_location &&
+    row.dropoff_name &&
+    row.dropoff_latitude !== null &&
+    row.dropoff_longitude !== null
+  ) {
     pickup.dropoffLocation = {
       id: row.dropoff_location,
       name: row.dropoff_name,
       coordinates: toCoordinates(row.dropoff_latitude, row.dropoff_longitude),
-      acceptedMaterials: (row.dropoff_accepted_materials || []) as RecyclingLocation['acceptedMaterials']
+      acceptedMaterials: (row.dropoff_accepted_materials ||
+        []) as RecyclingLocation["acceptedMaterials"],
     };
   }
 
@@ -83,27 +104,50 @@ export async function getPickupById(id: string): Promise<PickupRequest | null> {
 export async function createPickup(pickup: {
   id: string;
   userId: string;
-  material: PickupRequest['material'];
+  material: PickupRequest["material"];
   weightKg: number;
   pickupLocation: Coordinates;
+  address?: {
+    neighborhood?: string;
+    district?: string;
+    city?: string;
+    street?: string;
+    building?: string;
+  };
 }): Promise<PickupRequest> {
-  const { id, userId, material, weightKg, pickupLocation } = pickup;
+  const { id, userId, material, weightKg, pickupLocation, address } = pickup;
 
   await query(
-    `INSERT INTO pickups (id, user_id, material, weight_kg, pickup_latitude, pickup_longitude)
-     VALUES ($1, $2, $3, $4, $5, $6)` ,
-    [id, userId, material, weightKg, pickupLocation.latitude, pickupLocation.longitude]
+    `INSERT INTO pickups (id, user_id, material, weight_kg, pickup_latitude, pickup_longitude, neighborhood, district, city, street, building)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      id,
+      userId,
+      material,
+      weightKg,
+      pickupLocation.latitude,
+      pickupLocation.longitude,
+      address?.neighborhood ?? null,
+      address?.district ?? null,
+      address?.city ?? null,
+      address?.street ?? null,
+      address?.building ?? null,
+    ]
   );
 
   const created = await getPickupById(id);
   if (!created) {
-    throw new Error('Failed to create pickup');
+    throw new Error("Failed to create pickup");
   }
 
   return created;
 }
 
-export async function assignCourierToPickup(pickupId: string, courierId: string, dropoff?: RecyclingLocation) {
+export async function assignCourierToPickup(
+  pickupId: string,
+  courierId: string,
+  dropoff?: RecyclingLocation
+) {
   let locationId: string | null = null;
 
   if (dropoff) {
@@ -123,13 +167,15 @@ export async function assignCourierToPickup(pickupId: string, courierId: string,
 
   const updated = await getPickupById(pickupId);
   if (!updated) {
-    throw new Error('Failed to load pickup after assignment');
+    throw new Error("Failed to load pickup after assignment");
   }
 
   return updated;
 }
 
-export async function completePickup(pickupId: string): Promise<PickupRequest | null> {
+export async function completePickup(
+  pickupId: string
+): Promise<PickupRequest | null> {
   const { rows } = await query<PickupRow>(
     `UPDATE pickups
      SET status = 'completed',
@@ -158,7 +204,9 @@ export async function listPickups(): Promise<PickupRequest[]> {
   return rows.map(mapPickup);
 }
 
-export async function listPickupsByStatus(status: PickupRequest['status']): Promise<PickupRequest[]> {
+export async function listPickupsByStatus(
+  status: PickupRequest["status"]
+): Promise<PickupRequest[]> {
   const { rows } = await query<PickupRow>(
     `SELECT p.*, rl.name as dropoff_name, rl.latitude as dropoff_latitude, rl.longitude as dropoff_longitude,
             rl.accepted_materials as dropoff_accepted_materials
@@ -185,7 +233,10 @@ export async function listCompletedPickups(): Promise<PickupRequest[]> {
   return rows.map(mapPickup);
 }
 
-export async function saveCarbonReport(pickupId: string, estimatedSavingKg: number): Promise<void> {
+export async function saveCarbonReport(
+  pickupId: string,
+  estimatedSavingKg: number
+): Promise<void> {
   await query(
     `INSERT INTO carbon_reports (pickup_id, estimated_saving_kg)
      VALUES ($1, $2)

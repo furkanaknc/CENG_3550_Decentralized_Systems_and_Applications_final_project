@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import 'wallet_service.dart';
+import 'metamask_platform.dart' as metamask;
 
 class RecyclingPoint {
   final String id;
@@ -32,6 +33,7 @@ class PickupSummary {
     required this.longitude,
     this.createdAt,
     this.updatedAt,
+    this.address,
   });
 
   final String id;
@@ -42,6 +44,34 @@ class PickupSummary {
   final double longitude;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final PickupAddress? address;
+}
+
+class PickupAddress {
+  final String? neighborhood;
+  final String? district;
+  final String? city;
+  final String? street;
+  final String? building;
+
+  PickupAddress({
+    this.neighborhood,
+    this.district,
+    this.city,
+    this.street,
+    this.building,
+  });
+
+  String get summary {
+    final parts = <String>[];
+    if (street != null && street!.isNotEmpty) parts.add(street!);
+    if (building != null && building!.isNotEmpty) parts.add('No: $building');
+    if (neighborhood != null && neighborhood!.isNotEmpty)
+      parts.add(neighborhood!);
+    if (district != null && district!.isNotEmpty) parts.add(district!);
+    if (city != null && city!.isNotEmpty) parts.add(city!);
+    return parts.join(', ');
+  }
 }
 
 class PickupRequestResult {
@@ -149,6 +179,7 @@ class ApiService {
     required double weightKg,
     double? latitude,
     double? longitude,
+    Map<String, String?>? address,
   }) async {
     final userId = _auth.currentUser?.id ?? 'demo-user';
     final headers = {
@@ -156,21 +187,27 @@ class ApiService {
       ..._auth.getAuthHeaders(),
     };
 
+    final body = <String, dynamic>{
+      'userId': userId,
+      'material': material,
+      'weightKg': weightKg,
+      'pickupLocation': {
+        'id': 'user-location',
+        'coordinates': {
+          'latitude': latitude ?? _defaultLatitude,
+          'longitude': longitude ?? _defaultLongitude,
+        },
+      },
+    };
+
+    if (address != null) {
+      body['address'] = address;
+    }
+
     final response = await _client.post(
       _uri('/api/pickups'),
       headers: headers,
-      body: jsonEncode({
-        'userId': userId,
-        'material': material,
-        'weightKg': weightKg,
-        'pickupLocation': {
-          'id': 'user-location',
-          'coordinates': {
-            'latitude': latitude ?? _defaultLatitude,
-            'longitude': longitude ?? _defaultLongitude,
-          },
-        }
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode != 201) {
@@ -266,13 +303,24 @@ class ApiService {
 
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
 
-    if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
+    final isMetaMaskReady = metamask.isMetaMaskAvailable();
+    final isWalletConnectReady = _wallet.isConnected;
+
+    print(
+        '🔐 Signature check: MetaMask=$isMetaMaskReady, WalletConnect=$isWalletConnectReady, Address=$pickupManagerAddress');
+
+    if ((isMetaMaskReady || isWalletConnectReady) &&
+        pickupManagerAddress.isNotEmpty) {
       try {
         courierApproval =
             await createAcceptPickupSignature(pickupId, pickupManagerAddress);
+        print('✅ Signature created: $courierApproval');
       } catch (e) {
-        print('Failed to create signature, continuing without it: $e');
+        print('❌ Failed to create signature: $e');
       }
+    } else {
+      print(
+          '⚠️ Skipping signature: MetaMask=$isMetaMaskReady, WalletConnect=$isWalletConnectReady, Address=${pickupManagerAddress.isNotEmpty}');
     }
 
     final headers = {
@@ -306,13 +354,24 @@ class ApiService {
 
     final pickupManagerAddress = dotenv.env['PICKUP_MANAGER_ADDRESS'] ?? '';
 
-    if (_wallet.isConnected && pickupManagerAddress.isNotEmpty) {
+    final isMetaMaskReady = metamask.isMetaMaskAvailable();
+    final isWalletConnectReady = _wallet.isConnected;
+
+    print(
+        '🔐 Complete Signature check: MetaMask=$isMetaMaskReady, WalletConnect=$isWalletConnectReady, Address=$pickupManagerAddress');
+
+    if ((isMetaMaskReady || isWalletConnectReady) &&
+        pickupManagerAddress.isNotEmpty) {
       try {
         courierApproval =
             await createCompletePickupSignature(pickupId, pickupManagerAddress);
+        print('✅ Complete Signature created: $courierApproval');
       } catch (e) {
-        print('Failed to create signature, continuing without it: $e');
+        print('❌ Failed to create complete signature: $e');
       }
+    } else {
+      print(
+          '⚠️ Skipping complete signature: MetaMask=$isMetaMaskReady, WalletConnect=$isWalletConnectReady, Address=${pickupManagerAddress.isNotEmpty}');
     }
 
     final headers = {
@@ -358,10 +417,6 @@ class ApiService {
 
   Future<Map<String, dynamic>?> createAcceptPickupSignature(
       String pickupId, String pickupManagerAddress) async {
-    if (!_wallet.isConnected) {
-      return null;
-    }
-
     try {
       final nonceData = await getCourierNonce();
       final blockchainEnabled =
@@ -406,7 +461,16 @@ class ApiService {
         },
       };
 
-      final signature = await _wallet.signTypedData(typedData);
+      String? signature;
+
+      if (metamask.isMetaMaskAvailable()) {
+        signature =
+            await metamask.signTypedDataMetaMask(courierAddress, typedData);
+      }
+
+      if (signature == null && _wallet.isConnected) {
+        signature = await _wallet.signTypedData(typedData);
+      }
 
       if (signature == null) {
         throw ApiException('İmza oluşturulamadı');
@@ -424,10 +488,6 @@ class ApiService {
 
   Future<Map<String, dynamic>?> createCompletePickupSignature(
       String pickupId, String pickupManagerAddress) async {
-    if (!_wallet.isConnected) {
-      return null;
-    }
-
     try {
       final nonceData = await getCourierNonce();
       final blockchainEnabled =
@@ -472,7 +532,16 @@ class ApiService {
         },
       };
 
-      final signature = await _wallet.signTypedData(typedData);
+      String? signature;
+
+      if (metamask.isMetaMaskAvailable()) {
+        signature =
+            await metamask.signTypedDataMetaMask(courierAddress, typedData);
+      }
+
+      if (signature == null && _wallet.isConnected) {
+        signature = await _wallet.signTypedData(typedData);
+      }
 
       if (signature == null) {
         throw ApiException('İmza oluşturulamadı');
@@ -493,6 +562,18 @@ class ApiService {
     if (pickup == null) return null;
 
     final pickupLocation = pickup['pickupLocation'] as Map<String, dynamic>?;
+    final addressData = pickup['address'] as Map<String, dynamic>?;
+
+    PickupAddress? address;
+    if (addressData != null) {
+      address = PickupAddress(
+        neighborhood: addressData['neighborhood'] as String?,
+        district: addressData['district'] as String?,
+        city: addressData['city'] as String?,
+        street: addressData['street'] as String?,
+        building: addressData['building'] as String?,
+      );
+    }
 
     return PickupSummary(
       id: pickup['id']?.toString() ?? '',
@@ -505,6 +586,7 @@ class ApiService {
           _defaultLongitude,
       createdAt: _parseDateTime(pickup['createdAt']),
       updatedAt: _parseDateTime(pickup['updatedAt']),
+      address: address,
     );
   }
 

@@ -1,4 +1,9 @@
-export type RecyclingMaterial = 'plastic' | 'glass' | 'paper' | 'metal' | 'electronics';
+export type RecyclingMaterial =
+  | "plastic"
+  | "glass"
+  | "paper"
+  | "metal"
+  | "electronics";
 
 export interface User {
   id: string;
@@ -28,15 +33,24 @@ export interface Coordinates {
   longitude: number;
 }
 
+export interface PickupAddress {
+  neighborhood?: string;
+  district?: string;
+  city?: string;
+  street?: string;
+  building?: string;
+}
+
 export interface PickupRequest {
   id: string;
   userId: string;
   courierId?: string;
   material: RecyclingMaterial;
   weightKg: number;
-  status: 'pending' | 'assigned' | 'completed';
+  status: "pending" | "assigned" | "completed";
   pickupLocation: Coordinates;
   dropoffLocation?: RecyclingLocation;
+  address?: PickupAddress;
   createdAt: string;
   updatedAt: string;
 }

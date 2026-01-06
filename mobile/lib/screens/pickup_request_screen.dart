@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 
 class PickupRequestScreen extends StatefulWidget {
   const PickupRequestScreen({super.key});
@@ -14,39 +13,45 @@ class PickupRequestScreen extends StatefulWidget {
 class _PickupRequestScreenState extends State<PickupRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _weightController = TextEditingController();
-  final MapController _mapController = MapController();
+  final _streetController = TextEditingController();
+  final _buildingController = TextEditingController();
+  final LocationService _location = LocationService();
 
   String _material = 'plastic';
   String? _statusMessage;
   bool _statusIsError = false;
   bool _submitting = false;
-  bool _locationError = false;
-  LatLng? _selectedLocation;
+  bool _loadingAddress = true;
   PickupRequestResult? _result;
 
-  static const LatLng _initialCenter = LatLng(41.0082, 28.9784);
+  @override
+  void initState() {
+    super.initState();
+    _loadAddress();
+  }
+
+  Future<void> _loadAddress() async {
+    setState(() => _loadingAddress = true);
+
+    if (_location.currentPosition == null) {
+      await _location.restoreLastLocation();
+    }
+
+    if (_location.addressDetails == null && _location.currentPosition != null) {
+      await _location.fetchAddressDetails();
+    }
+
+    if (mounted) {
+      setState(() => _loadingAddress = false);
+    }
+  }
 
   @override
   void dispose() {
     _weightController.dispose();
+    _streetController.dispose();
+    _buildingController.dispose();
     super.dispose();
-  }
-
-  void _onLocationSelected(LatLng location) {
-    final camera = _mapController.camera;
-    final currentZoom = camera.zoom.isFinite ? camera.zoom : 13.0;
-    final double targetZoom = currentZoom < 14 ? 14.0 : currentZoom;
-    _mapController.move(location, targetZoom);
-
-    setState(() {
-      _selectedLocation = location;
-      _locationError = false;
-      if (_result != null) {
-        _result = null;
-        _statusMessage = null;
-        _statusIsError = false;
-      }
-    });
   }
 
   Future<void> _submit() async {
@@ -56,10 +61,9 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
       return;
     }
 
-    if (_selectedLocation == null) {
+    if (_location.currentPosition == null) {
       setState(() {
-        _locationError = true;
-        _statusMessage = 'Harita üzerinden teslim alınacak konumu seçmelisiniz.';
+        _statusMessage = 'Lütfen önce haritadan konumunuzu seçin.';
         _statusIsError = true;
       });
       return;
@@ -73,11 +77,22 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
 
     try {
       final weight = double.parse(_weightController.text.replaceAll(',', '.'));
+      final addressDetails = _location.addressDetails;
       final result = await ApiService().requestPickup(
         material: _material,
         weightKg: weight,
-        latitude: _selectedLocation!.latitude,
-        longitude: _selectedLocation!.longitude,
+        latitude: _location.latitude,
+        longitude: _location.longitude,
+        address: {
+          'neighborhood': addressDetails?.neighborhood,
+          'district': addressDetails?.district,
+          'city': addressDetails?.city,
+          'street':
+              _streetController.text.isNotEmpty ? _streetController.text : null,
+          'building': _buildingController.text.isNotEmpty
+              ? _buildingController.text
+              : null,
+        },
       );
 
       if (!mounted) {
@@ -104,7 +119,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
       }
       setState(() {
         _result = null;
-        _statusMessage = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
+        _statusMessage =
+            'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
         _statusIsError = true;
       });
     } finally {
@@ -122,8 +138,9 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
       _result = null;
       _statusMessage = null;
       _statusIsError = false;
-      _locationError = false;
       _weightController.clear();
+      _streetController.clear();
+      _buildingController.clear();
     });
   }
 
@@ -147,11 +164,11 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Geri dönüşüm atıklarını kapınızdan aldırmak için konumunuzu işaretleyin ve talep detaylarını paylaşın.',
+                'Geri dönüşüm atıklarını kapınızdan aldırmak için adres bilgilerinizi girin.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
-              _buildMapSection(context),
+              _buildAddressSection(context),
               const SizedBox(height: 24),
               Text('Toplama detayları', style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
@@ -162,27 +179,36 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownButtonFormField<String>(
-                        initialValue: _material,
-                        decoration: const InputDecoration(labelText: 'Atık türü'),
+                        value: _material,
+                        decoration:
+                            const InputDecoration(labelText: 'Atık türü'),
                         items: const [
-                          DropdownMenuItem(value: 'plastic', child: Text('Plastik')),
+                          DropdownMenuItem(
+                              value: 'plastic', child: Text('Plastik')),
                           DropdownMenuItem(value: 'glass', child: Text('Cam')),
-                          DropdownMenuItem(value: 'paper', child: Text('Kağıt')),
-                          DropdownMenuItem(value: 'metal', child: Text('Metal')),
-                          DropdownMenuItem(value: 'electronics', child: Text('Elektronik')),
+                          DropdownMenuItem(
+                              value: 'paper', child: Text('Kağıt')),
+                          DropdownMenuItem(
+                              value: 'metal', child: Text('Metal')),
+                          DropdownMenuItem(
+                              value: 'electronics', child: Text('Elektronik')),
                         ],
-                        onChanged: (value) => setState(() => _material = value ?? 'plastic'),
+                        onChanged: (value) =>
+                            setState(() => _material = value ?? 'plastic'),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _weightController,
-                        decoration: const InputDecoration(labelText: 'Ağırlık (kg)'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration:
+                            const InputDecoration(labelText: 'Ağırlık (kg)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Lütfen ağırlık giriniz';
                           }
-                          final parsed = double.tryParse(value.replaceAll(',', '.'));
+                          final parsed =
+                              double.tryParse(value.replaceAll(',', '.'));
                           if (parsed == null || parsed <= 0) {
                             return 'Geçerli bir değer giriniz';
                           }
@@ -196,10 +222,12 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.delivery_dining),
-                        label: Text(_submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
+                        label: Text(
+                            _submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
                       ),
                     ],
                   ),
@@ -242,104 +270,96 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
     );
   }
 
-  Widget _buildMapSection(BuildContext context) {
+  Widget _buildAddressSection(BuildContext context) {
     final theme = Theme.of(context);
+    final address = _location.addressDetails;
+    final hasLocation = _location.currentPosition != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: SizedBox(
-            height: 260,
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _selectedLocation ?? _initialCenter,
-                initialZoom: _selectedLocation != null ? 15 : 12,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                ),
-                onTap: (_, latLng) => _onLocationSelected(latLng),
-                onLongPress: (_, latLng) => _onLocationSelected(latLng),
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.greencycle.app',
-                ),
-                if (_selectedLocation != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _selectedLocation!,
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.bottomCenter,
-                        child: const Icon(
-                          Icons.person_pin_circle,
-                          color: Colors.blueAccent,
-                          size: 40,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.touch_app, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Teslim alınacak noktayı işaretlemek için harita üzerine tıklayın. '
-                'Konumu güncellemek istediğinizde tekrar tıklayabilirsiniz.',
-                style: theme.textTheme.bodySmall,
-              ),
+            Row(
+              children: [
+                Icon(Icons.location_on, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text('Adres Bilgileri', style: theme.textTheme.titleMedium),
+              ],
             ),
+            const Divider(height: 24),
+            if (_loadingAddress)
+              const Center(child: CircularProgressIndicator())
+            else if (!hasLocation)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.orange.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Konumunuz henüz belirlenmedi. Geri dönüp haritadan konum seçin.',
+                        style: TextStyle(color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Konum',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (address != null && address.summary.isNotEmpty)
+                      Text(address.summary, style: theme.textTheme.bodyLarge)
+                    else
+                      Text(
+                        '${_location.latitude.toStringAsFixed(4)}, ${_location.longitude.toStringAsFixed(4)}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _streetController,
+                decoration: const InputDecoration(
+                  labelText: 'Sokak / Cadde',
+                  hintText: 'Örn: Atatürk Caddesi',
+                  prefixIcon: Icon(Icons.signpost),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _buildingController,
+                decoration: const InputDecoration(
+                  labelText: 'Bina No / Daire',
+                  hintText: 'Örn: No: 45 / Daire: 3',
+                  prefixIcon: Icon(Icons.home),
+                ),
+              ),
+            ],
           ],
         ),
-        if (_selectedLocation != null) ...[
-          const SizedBox(height: 8),
-          Card(
-            margin: EdgeInsets.zero,
-            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.6),
-            child: ListTile(
-              leading: const Icon(Icons.place),
-              title: const Text('Seçilen konum'),
-              subtitle: Text(
-                '${_selectedLocation!.latitude.toStringAsFixed(4)}, '
-                '${_selectedLocation!.longitude.toStringAsFixed(4)}',
-              ),
-              trailing: IconButton(
-                tooltip: 'Konumu temizle',
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  setState(() {
-                    _selectedLocation = null;
-                    _locationError = false;
-                  });
-                },
-              ),
-            ),
-          ),
-        ],
-        if (_locationError) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Lütfen teslim alınacak konumu seçiniz.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -411,7 +431,8 @@ class _PickupSummaryCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               result.confirmationMessage,
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             _SummaryRow(
@@ -429,7 +450,8 @@ class _PickupSummaryCard extends StatelessWidget {
             _SummaryRow(
               icon: Icons.scale,
               label: 'Ağırlık',
-              value: '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material}',
+              value:
+                  '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material}',
             ),
             const SizedBox(height: 8),
             _SummaryRow(
@@ -483,7 +505,8 @@ class _SummaryRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               Text(
                 value,

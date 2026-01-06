@@ -79,10 +79,14 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   }
 
   Future<void> _acceptPickup(String pickupId) async {
+    _showProcessingDialog(
+        'İmza bekleniyor...', 'Lütfen cüzdanınızda imza onayı verin');
+
     try {
       await _api.acceptPickup(pickupId);
 
       if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Talep kabul edildi!'),
@@ -94,6 +98,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
       }
     } catch (e) {
       if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hata: ${e.toString()}'),
@@ -101,14 +106,39 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           ),
         );
       }
+    } finally {
+      // Dialog already closed
     }
   }
 
+  void _showProcessingDialog(String title, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _completePickup(String pickupId) async {
+    _showProcessingDialog(
+        'İmza bekleniyor...', 'Lütfen cüzdanınızda imza onayı verin');
+
     try {
       await _api.completePickup(pickupId);
 
       if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Talep tamamlandı! 🎉'),
@@ -120,6 +150,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
       }
     } catch (e) {
       if (mounted) {
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hata: ${e.toString()}'),
@@ -127,6 +158,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           ),
         );
       }
+    } finally {
+      // Dialog already closed
     }
   }
 
@@ -255,6 +288,42 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
               ],
             ),
             const SizedBox(height: 12),
+            if (pickup.address != null &&
+                pickup.address!.summary.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.home, size: 16, color: Colors.blue.shade700),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Adres',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      pickup.address!.summary,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 Icon(
@@ -328,7 +397,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             else if (!isPending && pickup.status == 'completed')
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                  Icon(Icons.check_circle,
+                      color: Colors.green.shade700, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     'Tamamlandı',
@@ -362,7 +432,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
     }
   }
 
-  Widget _buildPickupList(List<PickupSummary> pickups, {required bool isPending}) {
+  Widget _buildPickupList(List<PickupSummary> pickups,
+      {required bool isPending}) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -418,7 +489,9 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              isPending ? 'Bekleyen talep yok' : 'Henüz kabul ettiğiniz talep yok',
+              isPending
+                  ? 'Bekleyen talep yok'
+                  : 'Henüz kabul ettiğiniz talep yok',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade600,
@@ -532,7 +605,6 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
               ],
             ),
           ),
-
           Expanded(
             child: TabBarView(
               controller: _tabController,
