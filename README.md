@@ -1,6 +1,6 @@
 # 🌱 Green Cycle - Blockchain-Based Recycling Platform
 
-A sustainable recycling platform with MetaMask wallet integration, courier management, map-based tracking, blockchain rewards, and a coupon system.
+A sustainable recycling platform with MetaMask wallet integration, courier management, map-based tracking, blockchain rewards, and a coupon system. This project proposes a hybrid recycling model combining courier-based waste collection and map-based drop-off points to increase user participation in recycling. Unlike existing centralized recycling apps, our system uses decentralized incentives and automated verification.
 
 ## ✨ Features
 
