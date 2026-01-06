@@ -61,19 +61,22 @@ class _HomeShellState extends State<HomeShell> {
       ];
 
   List<NavigationDestination> get _userDestinations => const [
-        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
-        NavigationDestination(icon: Icon(Icons.recycling), label: 'Teslim'),
-        NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Ödüller'),
+        NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
+        NavigationDestination(icon: Icon(Icons.recycling), label: 'Pickup'),
+        NavigationDestination(
+            icon: Icon(Icons.card_giftcard), label: 'Rewards'),
       ];
 
   List<NavigationDestination> get _courierDestinations => const [
-        NavigationDestination(icon: Icon(Icons.local_shipping), label: 'Talepler'),
-        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
+        NavigationDestination(
+            icon: Icon(Icons.local_shipping), label: 'Requests'),
+        NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
       ];
 
   List<NavigationDestination> get _adminDestinations => const [
-        NavigationDestination(icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
-        NavigationDestination(icon: Icon(Icons.map), label: 'Harita'),
+        NavigationDestination(
+            icon: Icon(Icons.admin_panel_settings), label: 'Admin'),
+        NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
       ];
 
   @override
@@ -96,16 +99,16 @@ class _HomeShellState extends State<HomeShell> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Çıkış Yap'),
-        content: const Text('Çıkış yapmak istediğinizden emin misiniz?'),
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Çıkış Yap'),
+            child: const Text('Logout'),
           ),
         ],
       ),
@@ -124,10 +127,10 @@ class _HomeShellState extends State<HomeShell> {
     final user = _auth.currentUser;
     final isAdmin = user?.isAdmin ?? false;
     final isCourier = user?.isCourier ?? false;
-    
+
     final List<Widget> pages;
     final List<NavigationDestination> destinations;
-    
+
     if (isAdmin) {
       pages = _adminPages;
       destinations = _adminDestinations;
@@ -146,7 +149,8 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Green Cycle'),
-        backgroundColor: isAdmin ? Colors.purple.shade700 : Colors.green.shade700,
+        backgroundColor:
+            isAdmin ? Colors.purple.shade700 : Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
           Container(
@@ -180,4 +184,3 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 }
-

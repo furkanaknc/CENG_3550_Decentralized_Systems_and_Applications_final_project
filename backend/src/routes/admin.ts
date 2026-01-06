@@ -14,6 +14,10 @@ import {
   getLocations,
   createLocation,
   removeLocation,
+  getCoupons,
+  addCoupon,
+  editCoupon,
+  removeCoupon,
 } from "../controllers/adminController";
 
 const router = Router();
@@ -39,5 +43,10 @@ router.get("/blockchain/stats", getBlockchainStatsEndpoint);
 router.get("/blockchain/materials", getMaterialWeights);
 router.put("/blockchain/materials/:name", updateMaterialWeight);
 router.post("/blockchain/sync-role/:userId", syncUserRole);
+
+router.get("/coupons", getCoupons);
+router.post("/coupons", addCoupon);
+router.patch("/coupons/:id", editCoupon);
+router.delete("/coupons/:id", removeCoupon);
 
 export default router;

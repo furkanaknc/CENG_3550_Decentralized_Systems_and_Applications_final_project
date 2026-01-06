@@ -146,6 +146,30 @@ export async function addGreenPoints(
   );
 }
 
+export async function getGreenPoints(userId: string): Promise<number> {
+  const { rows } = await query<{ green_points: number }>(
+    "SELECT green_points FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+
+  if (rows.length === 0) return 0;
+  return rows[0].green_points;
+}
+
+export async function deductGreenPoints(
+  userId: string,
+  points: number
+): Promise<boolean> {
+  const { rowCount } = await query(
+    `UPDATE users 
+     SET green_points = green_points - $1, updated_at = NOW()
+     WHERE id = $2 AND green_points >= $1`,
+    [points, userId]
+  );
+
+  return (rowCount ?? 0) > 0;
+}
+
 export async function listUsersByRole(role: UserRole): Promise<User[]> {
   const { rows } = await query<UserRow>(
     "SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC",

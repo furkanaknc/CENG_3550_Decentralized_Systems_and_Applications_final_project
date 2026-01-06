@@ -7,6 +7,7 @@ import courierRouter from "./routes/couriers";
 import analyticsRouter from "./routes/analytics";
 import mapRouter from "./routes/maps";
 import adminRouter from "./routes/admin";
+import couponRouter from "./routes/coupons";
 import { runMigrations } from "./db/migrate";
 import { shutdownPool } from "./db/client";
 import { seedAdmin } from "./db/admin-seed";
@@ -23,6 +24,7 @@ app.use("/api/couriers", courierRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/maps", mapRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/coupons", couponRouter);
 
 const port = parseInt(process.env.PORT || "4000", 10);
 

@@ -233,6 +233,22 @@ export async function listCompletedPickups(): Promise<PickupRequest[]> {
   return rows.map(mapPickup);
 }
 
+export async function listCompletedPickupsForUser(
+  userId: string
+): Promise<PickupRequest[]> {
+  const { rows } = await query<PickupRow>(
+    `SELECT p.*, rl.name as dropoff_name, rl.latitude as dropoff_latitude, rl.longitude as dropoff_longitude,
+            rl.accepted_materials as dropoff_accepted_materials
+     FROM pickups p
+     LEFT JOIN recycling_locations rl ON rl.id = p.dropoff_location
+     WHERE p.status = 'completed' AND p.user_id = $1
+     ORDER BY p.updated_at DESC`,
+    [userId]
+  );
+
+  return rows.map(mapPickup);
+}
+
 export async function saveCarbonReport(
   pickupId: string,
   estimatedSavingKg: number

@@ -83,8 +83,8 @@ class PickupRequestResult {
   final PickupSummary pickup;
   final List<RecyclingPoint> nearbyLocations;
 
-  String get confirmationMessage => 'Talebiniz alındı (#${pickup.id}). '
-      '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material} kaydedildi.';
+  String get confirmationMessage => 'Request received (#${pickup.id}). '
+      '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material} recorded.';
 }
 
 class RewardSummary {
@@ -92,6 +92,109 @@ class RewardSummary {
   final double carbonSavings;
 
   RewardSummary({required this.points, required this.carbonSavings});
+}
+
+class Coupon {
+  final String id;
+  final String name;
+  final String? description;
+  final String partner;
+  final String discountType;
+  final double discountValue;
+  final int pointCost;
+  final bool isActive;
+  final String? imageUrl;
+
+  Coupon({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.partner,
+    required this.discountType,
+    required this.discountValue,
+    required this.pointCost,
+    required this.isActive,
+    this.imageUrl,
+  });
+
+  factory Coupon.fromJson(Map<String, dynamic> json) {
+    return Coupon(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      partner: json['partner']?.toString() ?? '',
+      discountType: json['discountType']?.toString() ?? 'fixed',
+      discountValue: (json['discountValue'] as num?)?.toDouble() ?? 0,
+      pointCost: (json['pointCost'] as num?)?.toInt() ?? 0,
+      isActive: json['isActive'] as bool? ?? true,
+      imageUrl: json['imageUrl']?.toString(),
+    );
+  }
+
+  String get displayDiscount {
+    if (discountType == 'percentage') {
+      return '${discountValue.toInt()}% Off';
+    } else {
+      return '${discountValue.toInt()}₺';
+    }
+  }
+}
+
+class UserCoupon {
+  final String id;
+  final String couponId;
+  final String couponCode;
+  final DateTime purchasedAt;
+  final DateTime? usedAt;
+  final DateTime? expiresAt;
+  final Coupon? coupon;
+
+  UserCoupon({
+    required this.id,
+    required this.couponId,
+    required this.couponCode,
+    required this.purchasedAt,
+    this.usedAt,
+    this.expiresAt,
+    this.coupon,
+  });
+
+  factory UserCoupon.fromJson(Map<String, dynamic> json) {
+    return UserCoupon(
+      id: json['id']?.toString() ?? '',
+      couponId: json['couponId']?.toString() ?? '',
+      couponCode: json['couponCode']?.toString() ?? '',
+      purchasedAt: DateTime.tryParse(json['purchasedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      usedAt: json['usedAt'] != null
+          ? DateTime.tryParse(json['usedAt'].toString())
+          : null,
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.tryParse(json['expiresAt'].toString())
+          : null,
+      coupon: json['coupon'] != null
+          ? Coupon.fromJson(json['coupon'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  bool get isExpired =>
+      expiresAt != null && expiresAt!.isBefore(DateTime.now());
+  bool get isUsed => usedAt != null;
+}
+
+class PurchaseResult {
+  final bool success;
+  final String message;
+  final UserCoupon? userCoupon;
+  final int? remainingPoints;
+
+  PurchaseResult({
+    required this.success,
+    required this.message,
+    this.userCoupon,
+    this.remainingPoints,
+  });
 }
 
 class ApiException implements Exception {
@@ -167,7 +270,7 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw ApiException(
-          'Geri dönüşüm merkezleri alınamadı', response.statusCode);
+          'Failed to fetch recycling centers', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -211,7 +314,8 @@ class ApiService {
     );
 
     if (response.statusCode != 201) {
-      throw ApiException('Kurye talebi oluşturulamadı', response.statusCode);
+      throw ApiException(
+          'Failed to create pickup request', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -223,7 +327,7 @@ class ApiService {
         _mapRecyclingPoints(payload['nearbyLocations'] as List<dynamic>?);
 
     final summary = PickupSummary(
-      id: pickup['id']?.toString() ?? 'bilinmiyor',
+      id: pickup['id']?.toString() ?? 'unknown',
       material: pickup['material']?.toString() ?? material,
       weightKg: (pickup['weightKg'] as num?)?.toDouble() ?? weightKg,
       status: pickup['status']?.toString() ?? 'pending',
@@ -241,10 +345,16 @@ class ApiService {
   }
 
   Future<RewardSummary> fetchRewardSummary() async {
-    final response = await _client.get(_uri('/api/analytics'));
+    final userId = _auth.currentUser?.id;
+    final queryParams = <String, String>{};
+    if (userId != null) {
+      queryParams['userId'] = userId;
+    }
+
+    final response = await _client.get(_uri('/api/analytics', queryParams));
 
     if (response.statusCode != 200) {
-      throw ApiException('Ödül bilgileri alınamadı', response.statusCode);
+      throw ApiException('Failed to fetch rewards', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -252,6 +362,86 @@ class ApiService {
     final totalCarbon = (payload['totalCarbon'] as num?)?.toDouble() ?? 0.0;
 
     return RewardSummary(points: totalPoints, carbonSavings: totalCarbon);
+  }
+
+  Future<List<Coupon>> fetchCoupons() async {
+    final response = await _client.get(_uri('/api/coupons'));
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to fetch coupons', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final coupons = payload['coupons'] as List<dynamic>? ?? [];
+
+    return coupons
+        .map((c) => Coupon.fromJson(c as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PurchaseResult> purchaseCoupon(String couponId) async {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) {
+      return PurchaseResult(
+        success: false,
+        message: 'Login required',
+      );
+    }
+
+    final headers = {
+      'Content-Type': 'application/json',
+      ..._auth.getAuthHeaders(),
+    };
+
+    final response = await _client.post(
+      _uri('/api/coupons/$couponId/purchase'),
+      headers: headers,
+      body: jsonEncode({'userId': userId}),
+    );
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      return PurchaseResult(
+        success: false,
+        message: payload['message']?.toString() ?? 'Failed to purchase coupon',
+        remainingPoints: (payload['remainingPoints'] as num?)?.toInt(),
+      );
+    }
+
+    final userCouponData = payload['userCoupon'] as Map<String, dynamic>?;
+    return PurchaseResult(
+      success: true,
+      message: payload['message']?.toString() ?? 'Coupon purchased',
+      userCoupon:
+          userCouponData != null ? UserCoupon.fromJson(userCouponData) : null,
+      remainingPoints: (payload['remainingPoints'] as num?)?.toInt(),
+    );
+  }
+
+  Future<List<UserCoupon>> fetchMyCoupons() async {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) {
+      return [];
+    }
+
+    final headers = _auth.getAuthHeaders();
+
+    final response = await _client.get(
+      _uri('/api/coupons/my', {'userId': userId}),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException('Failed to fetch your coupons', response.statusCode);
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final userCoupons = payload['userCoupons'] as List<dynamic>? ?? [];
+
+    return userCoupons
+        .map((c) => UserCoupon.fromJson(c as Map<String, dynamic>))
+        .toList();
   }
 
   DateTime? _parseDateTime(dynamic value) {
@@ -270,7 +460,8 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Bekleyen talepler alınamadı', response.statusCode);
+      throw ApiException(
+          'Failed to fetch pending requests', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -289,7 +480,7 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw ApiException(
-          'Kabul edilmiş talepler alınamadı', response.statusCode);
+          'Failed to fetch accepted requests', response.statusCode);
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -340,7 +531,8 @@ class ApiService {
 
     if (response.statusCode != 200) {
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
-      final message = payload['message'] as String? ?? 'Talep kabul edilemedi';
+      final message =
+          payload['message'] as String? ?? 'Failed to accept request';
       throw ApiException(message, response.statusCode);
     }
 
@@ -391,7 +583,8 @@ class ApiService {
 
     if (response.statusCode != 200) {
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
-      final message = payload['message'] as String? ?? 'Talep tamamlanamadı';
+      final message =
+          payload['message'] as String? ?? 'Failed to complete request';
       throw ApiException(message, response.statusCode);
     }
 
@@ -409,7 +602,7 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException('Nonce alınamadı', response.statusCode);
+      throw ApiException('Failed to fetch nonce', response.statusCode);
     }
 
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -473,7 +666,7 @@ class ApiService {
       }
 
       if (signature == null) {
-        throw ApiException('İmza oluşturulamadı');
+        throw ApiException('Failed to create signature');
       }
 
       return {
@@ -544,7 +737,7 @@ class ApiService {
       }
 
       if (signature == null) {
-        throw ApiException('İmza oluşturulamadı');
+        throw ApiException('Failed to create signature');
       }
 
       return {

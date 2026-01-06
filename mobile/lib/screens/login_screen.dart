@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _navigateToHome();
         } else {
           setState(() {
-            _errorMessage = 'Giriş başarısız oldu.';
+            _errorMessage = 'Login failed.';
           });
         }
       }
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 print('❌ User cancelled connection');
                 Navigator.of(context).pop();
                 setState(() {
-                  _errorMessage = 'Bağlantı iptal edildi';
+                  _errorMessage = 'Connection cancelled';
                 });
               },
             ),
@@ -146,14 +146,14 @@ class _LoginScreenState extends State<LoginScreen> {
             _navigateToHome();
           } else {
             setState(() {
-              _errorMessage = 'Giriş başarısız oldu.';
+              _errorMessage = 'Login failed.';
             });
           }
         }
       } else {
         print('❌ ConnectResponse is null or invalid');
         setState(() {
-          _errorMessage = 'Bağlantı oluşturulamadı.';
+          _errorMessage = 'Could not create connection.';
         });
       }
     } catch (e) {
@@ -230,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Blockchain Tabanlı Geri Dönüşüm',
+                    'Blockchain-Based Recycling',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.white.withOpacity(0.9),
@@ -247,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         children: [
                           const Text(
-                            'Giriş Yap',
+                            'Sign In',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -255,14 +255,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Cüzdanınızla giriş yapın',
+                            'Connect with your wallet',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.grey.shade600,
                             ),
                           ),
                           const SizedBox(height: 24),
-
                           if (_errorMessage != null)
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -287,7 +286,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ],
                               ),
                             ),
-
                           if (_hasMetaMask) ...[
                             SizedBox(
                               width: double.infinity,
@@ -317,8 +315,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                 label: Text(
                                   _isMetaMaskLoading
-                                      ? 'Bağlanıyor...'
-                                      : 'MetaMask ile Giriş',
+                                      ? 'Connecting...'
+                                      : 'Sign in with MetaMask',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -342,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16),
-                                  child: Text('veya',
+                                  child: Text('or',
                                       style: TextStyle(
                                           color: Colors.grey.shade500)),
                                 ),
@@ -353,7 +351,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 12),
                           ],
-
                           SizedBox(
                             width: double.infinity,
                             height: 56,
@@ -373,8 +370,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : const Icon(Icons.qr_code),
                               label: Text(
                                 _isLoading
-                                    ? 'Bağlanıyor...'
-                                    : 'QR Kod ile Bağlan',
+                                    ? 'Connecting...'
+                                    : 'Connect with QR',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -406,7 +403,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Sepolia Test Network kullanılmaktadır',
+                            'Using Sepolia Test Network',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,

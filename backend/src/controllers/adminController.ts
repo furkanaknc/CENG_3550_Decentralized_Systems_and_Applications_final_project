@@ -263,7 +263,6 @@ export async function syncUserRole(req: AuthenticatedRequest, res: Response) {
   }
 }
 
-
 import {
   listAllLocations,
   upsertRecyclingLocation,
@@ -327,5 +326,129 @@ export async function removeLocation(req: AuthenticatedRequest, res: Response) {
   } catch (error) {
     console.error("Failed to delete location:", error);
     res.status(500).json({ message: "Failed to delete location" });
+  }
+}
+
+import {
+  getAllCoupons,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
+} from "../repositories/couponsRepository";
+
+export async function getCoupons(req: AuthenticatedRequest, res: Response) {
+  try {
+    const coupons = await getAllCoupons(false);
+    res.json({ coupons });
+  } catch (error) {
+    console.error("Failed to list coupons:", error);
+    res.status(500).json({ message: "Failed to list coupons" });
+  }
+}
+
+export async function addCoupon(req: AuthenticatedRequest, res: Response) {
+  const {
+    name,
+    description,
+    partner,
+    discountType,
+    discountValue,
+    pointCost,
+    imageUrl,
+  } = req.body;
+
+  if (
+    !name ||
+    !partner ||
+    !discountType ||
+    discountValue === undefined ||
+    pointCost === undefined
+  ) {
+    return res.status(400).json({
+      message:
+        "Name, partner, discountType, discountValue, and pointCost are required",
+    });
+  }
+
+  if (!["percentage", "fixed"].includes(discountType)) {
+    return res
+      .status(400)
+      .json({ message: "discountType must be 'percentage' or 'fixed'" });
+  }
+
+  try {
+    const coupon = await createCoupon({
+      name,
+      description,
+      partner,
+      discountType,
+      discountValue,
+      pointCost,
+      imageUrl,
+    });
+
+    res.status(201).json({
+      message: "Coupon created successfully",
+      coupon,
+    });
+  } catch (error) {
+    console.error("Failed to create coupon:", error);
+    res.status(500).json({ message: "Failed to create coupon" });
+  }
+}
+
+export async function editCoupon(req: AuthenticatedRequest, res: Response) {
+  const { id } = req.params;
+  const {
+    name,
+    description,
+    partner,
+    discountType,
+    discountValue,
+    pointCost,
+    isActive,
+    imageUrl,
+  } = req.body;
+
+  try {
+    const coupon = await updateCoupon(id, {
+      name,
+      description,
+      partner,
+      discountType,
+      discountValue,
+      pointCost,
+      isActive,
+      imageUrl,
+    });
+
+    if (!coupon) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+
+    res.json({
+      message: "Coupon updated successfully",
+      coupon,
+    });
+  } catch (error) {
+    console.error("Failed to update coupon:", error);
+    res.status(500).json({ message: "Failed to update coupon" });
+  }
+}
+
+export async function removeCoupon(req: AuthenticatedRequest, res: Response) {
+  const { id } = req.params;
+
+  try {
+    const deleted = await deleteCoupon(id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+
+    res.json({ message: "Coupon deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete coupon:", error);
+    res.status(500).json({ message: "Failed to delete coupon" });
   }
 }
