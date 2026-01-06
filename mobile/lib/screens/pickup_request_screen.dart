@@ -63,7 +63,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
 
     if (_location.currentPosition == null) {
       setState(() {
-        _statusMessage = 'Lütfen önce haritadan konumunuzu seçin.';
+        _statusMessage = 'Please select your location from the map first.';
         _statusIsError = true;
       });
       return;
@@ -119,8 +119,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
       }
       setState(() {
         _result = null;
-        _statusMessage =
-            'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
+        _statusMessage = 'An unexpected error occurred. Please try again.';
         _statusIsError = true;
       });
     } finally {
@@ -152,10 +151,10 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
-          tooltip: 'Kapat',
+          tooltip: 'Close',
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('Kurye talep et'),
+        title: const Text('Request Courier'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -164,13 +163,13 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Geri dönüşüm atıklarını kapınızdan aldırmak için adres bilgilerinizi girin.',
+                'Enter your address details to have recycling waste picked up from your door.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
               _buildAddressSection(context),
               const SizedBox(height: 24),
-              Text('Toplama detayları', style: theme.textTheme.titleMedium),
+              Text('Pickup details', style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
               Material(
                 child: Form(
@@ -181,17 +180,18 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                       DropdownButtonFormField<String>(
                         value: _material,
                         decoration:
-                            const InputDecoration(labelText: 'Atık türü'),
+                            const InputDecoration(labelText: 'Waste type'),
                         items: const [
                           DropdownMenuItem(
-                              value: 'plastic', child: Text('Plastik')),
-                          DropdownMenuItem(value: 'glass', child: Text('Cam')),
+                              value: 'plastic', child: Text('Plastic')),
                           DropdownMenuItem(
-                              value: 'paper', child: Text('Kağıt')),
+                              value: 'glass', child: Text('Glass')),
+                          DropdownMenuItem(
+                              value: 'paper', child: Text('Paper')),
                           DropdownMenuItem(
                               value: 'metal', child: Text('Metal')),
                           DropdownMenuItem(
-                              value: 'electronics', child: Text('Elektronik')),
+                              value: 'electronics', child: Text('Electronics')),
                         ],
                         onChanged: (value) =>
                             setState(() => _material = value ?? 'plastic'),
@@ -200,17 +200,17 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                       TextFormField(
                         controller: _weightController,
                         decoration:
-                            const InputDecoration(labelText: 'Ağırlık (kg)'),
+                            const InputDecoration(labelText: 'Weight (kg)'),
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Lütfen ağırlık giriniz';
+                            return 'Please enter weight';
                           }
                           final parsed =
                               double.tryParse(value.replaceAll(',', '.'));
                           if (parsed == null || parsed <= 0) {
-                            return 'Geçerli bir değer giriniz';
+                            return 'Please enter a valid value';
                           }
                           return null;
                         },
@@ -227,7 +227,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                               )
                             : const Icon(Icons.delivery_dining),
                         label: Text(
-                            _submitting ? 'Gönderiliyor...' : 'Kurye talep et'),
+                            _submitting ? 'Submitting...' : 'Request Courier'),
                       ),
                     ],
                   ),
@@ -255,7 +255,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                 if (_result!.nearbyLocations.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
-                    'Yakınınızdaki geri dönüşüm noktaları',
+                    'Nearby recycling points',
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -285,7 +285,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
               children: [
                 Icon(Icons.location_on, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('Adres Bilgileri', style: theme.textTheme.titleMedium),
+                Text('Address Details', style: theme.textTheme.titleMedium),
               ],
             ),
             const Divider(height: 24),
@@ -304,7 +304,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Konumunuz henüz belirlenmedi. Geri dönüp haritadan konum seçin.',
+                        'Location not set yet. Go back and select a location from the map.',
                         style: TextStyle(color: Colors.orange.shade800),
                       ),
                     ),
@@ -322,7 +322,7 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Konum',
+                      'Location',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -342,8 +342,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
               TextFormField(
                 controller: _streetController,
                 decoration: const InputDecoration(
-                  labelText: 'Sokak / Cadde',
-                  hintText: 'Örn: Atatürk Caddesi',
+                  labelText: 'Street / Avenue',
+                  hintText: 'E.g: Main Street',
                   prefixIcon: Icon(Icons.signpost),
                 ),
               ),
@@ -351,8 +351,8 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
               TextFormField(
                 controller: _buildingController,
                 decoration: const InputDecoration(
-                  labelText: 'Bina No / Daire',
-                  hintText: 'Örn: No: 45 / Daire: 3',
+                  labelText: 'Building No / Apartment',
+                  hintText: 'E.g: No: 45 / Apt: 3',
                   prefixIcon: Icon(Icons.home),
                 ),
               ),
@@ -378,11 +378,11 @@ class _PickupRequestScreenState extends State<PickupRequestScreen> {
   String _statusLabel(String status) {
     switch (status) {
       case 'pending':
-        return 'Kurye ataması bekleniyor';
+        return 'Waiting for courier assignment';
       case 'assigned':
-        return 'Kurye yolda';
+        return 'Courier on the way';
       case 'completed':
-        return 'Tamamlandı';
+        return 'Completed';
       default:
         return status;
     }
@@ -427,7 +427,7 @@ class _PickupSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Talep özeti', style: theme.textTheme.titleMedium),
+            Text('Request summary', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
               result.confirmationMessage,
@@ -437,33 +437,33 @@ class _PickupSummaryCard extends StatelessWidget {
             const SizedBox(height: 12),
             _SummaryRow(
               icon: Icons.badge,
-              label: 'Talep numarası',
+              label: 'Request number',
               value: pickup.id,
             ),
             const SizedBox(height: 8),
             _SummaryRow(
               icon: Icons.hourglass_bottom,
-              label: 'Durum',
+              label: 'Status',
               value: statusLabel,
             ),
             const SizedBox(height: 8),
             _SummaryRow(
               icon: Icons.scale,
-              label: 'Ağırlık',
+              label: 'Weight',
               value:
                   '${pickup.weightKg.toStringAsFixed(1)} kg ${pickup.material}',
             ),
             const SizedBox(height: 8),
             _SummaryRow(
               icon: Icons.place,
-              label: 'Alım konumu',
+              label: 'Pickup location',
               value: locationLabel,
             ),
             if (createdAtLabel != null) ...[
               const SizedBox(height: 8),
               _SummaryRow(
                 icon: Icons.schedule,
-                label: 'Oluşturulma',
+                label: 'Created at',
                 value: createdAtLabel!,
               ),
             ],
@@ -471,7 +471,7 @@ class _PickupSummaryCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onStartNew,
               icon: const Icon(Icons.refresh),
-              label: const Text('Yeni talep oluştur'),
+              label: const Text('Create new request'),
             ),
           ],
         ),

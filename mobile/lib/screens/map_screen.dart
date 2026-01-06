@@ -82,8 +82,7 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
       setState(() {
-        _errorMessage =
-            'Geri dönüşüm noktaları yüklenemedi. Lütfen tekrar deneyin.';
+        _errorMessage = 'Failed to load recycling points. Please try again.';
         _loading = false;
       });
     }
@@ -105,7 +104,7 @@ class _MapScreenState extends State<MapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-            '📍 Konumunuz ayarlandı: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}'),
+            '📍 Location set: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}'),
         backgroundColor: Colors.green,
       ),
     );
@@ -160,27 +159,27 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Yeni Geri Dönüşüm Noktası'),
+          title: const Text('New Recycling Point'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '📍 Konum: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}',
+                  '📍 Location: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Nokta Adı',
-                    hintText: 'Örn: Kadıköy Geri Dönüşüm Merkezi',
+                    labelText: 'Point Name',
+                    hintText: 'E.g: Central Recycling Center',
                     border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Kabul Edilen Materyaller:'),
+                const Text('Accepted Materials:'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -208,13 +207,13 @@ class _MapScreenState extends State<MapScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
                 if (nameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lütfen bir isim girin')),
+                    const SnackBar(content: Text('Please enter a name')),
                   );
                   return;
                 }
@@ -225,7 +224,7 @@ class _MapScreenState extends State<MapScreen> {
                   selectedMaterials.toList(),
                 );
               },
-              child: const Text('Oluştur'),
+              child: const Text('Create'),
             ),
           ],
         ),
@@ -244,7 +243,7 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Nokta oluşturuluyor...'),
+            Text('Creating point...'),
           ],
         ),
       ),
@@ -270,19 +269,19 @@ class _MapScreenState extends State<MapScreen> {
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ "$name" oluşturuldu!'),
+            content: Text('✅ "$name" created!'),
             backgroundColor: Colors.green,
           ),
         );
         _loadPoints();
       } else {
-        throw Exception('Sunucu hatası: ${response.statusCode}');
+        throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Oluşturulamadı: $e'),
+          content: Text('❌ Creation failed: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -309,7 +308,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _retry, child: const Text('Tekrar dene')),
+            FilledButton(onPressed: _retry, child: const Text('Try again')),
           ],
         ),
       );
@@ -422,7 +421,7 @@ class _MapScreenState extends State<MapScreen> {
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Haritaya dokunarak konumunuzu seçin',
+                      'Tap on the map to set your location',
                       style: TextStyle(
                           color: Colors.white, fontWeight: FontWeight.bold),
                     ),
@@ -510,20 +509,20 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 _MapControlButton(
                   icon: Icons.add,
-                  tooltip: 'Yakınlaştır',
+                  tooltip: 'Zoom in',
                   onPressed: _zoomIn,
                 ),
                 const SizedBox(height: 12),
                 _MapControlButton(
                   icon: Icons.remove,
-                  tooltip: 'Uzaklaştır',
+                  tooltip: 'Zoom out',
                   onPressed: _zoomOut,
                 ),
                 if (_points.length > 1) ...[
                   const SizedBox(height: 12),
                   _MapControlButton(
                     icon: Icons.center_focus_strong,
-                    tooltip: 'Tüm noktaları göster',
+                    tooltip: 'Show all points',
                     onPressed: () => _fitCameraToPoints(_points),
                   ),
                 ],
@@ -546,7 +545,7 @@ class _MapScreenState extends State<MapScreen> {
                 );
               },
               icon: const Icon(Icons.delivery_dining),
-              label: const Text('Kurye talep et'),
+              label: const Text('Request courier'),
             ),
           ),
         ),
@@ -580,7 +579,7 @@ class _MapScreenState extends State<MapScreen> {
                 if (_isAdmin)
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    tooltip: 'Noktayı Sil',
+                    tooltip: 'Delete Point',
                     onPressed: () => _confirmDeleteLocation(point),
                   ),
               ],
@@ -592,7 +591,7 @@ class _MapScreenState extends State<MapScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Kabul edilen materyaller: ${point.acceptedMaterials.join(', ')}',
+                    'Accepted materials: ${point.acceptedMaterials.join(', ')}',
                     style: textTheme.bodyMedium,
                   ),
                 ),
@@ -604,7 +603,7 @@ class _MapScreenState extends State<MapScreen> {
                 const Icon(Icons.place, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Konum: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}',
+                  'Location: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}',
                   style: textTheme.bodySmall,
                 ),
               ],
@@ -620,13 +619,12 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning, color: Colors.orange, size: 48),
-        title: const Text('Noktayı Sil'),
-        content:
-            Text('"${point.name}" noktasını silmek istediğinize emin misiniz?'),
+        title: const Text('Delete Point'),
+        content: Text('Are you sure you want to delete "${point.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -634,7 +632,7 @@ class _MapScreenState extends State<MapScreen> {
               Navigator.pop(context);
               _deleteLocation(point);
             },
-            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -651,7 +649,7 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Siliniyor...'),
+            Text('Deleting...'),
           ],
         ),
       ),
@@ -669,19 +667,19 @@ class _MapScreenState extends State<MapScreen> {
         setState(() => _selectedPoint = null);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ "${point.name}" silindi'),
+            content: Text('✅ "${point.name}" deleted'),
             backgroundColor: Colors.green,
           ),
         );
         _loadPoints();
       } else {
-        throw Exception('Sunucu hatası: ${response.statusCode}');
+        throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Silinemedi: $e'),
+          content: Text('❌ Delete failed: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -710,14 +708,14 @@ class _WebHelpCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Chrome üzerinde haritayı incelemek için fare ile sürükleyebilir, '
-                'yakınlaştırma butonlarını kullanabilir veya Ctrl tuşuna basıp '
-                'mouse tekerleğini çevirebilirsin.',
+                'To navigate the map on Chrome, you can drag with the mouse, '
+                'use the zoom buttons, or hold Ctrl and scroll '
+                'with the mouse wheel.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
             IconButton(
-              tooltip: 'Kapat',
+              tooltip: 'Close',
               onPressed: onClose,
               icon: const Icon(Icons.close),
             ),

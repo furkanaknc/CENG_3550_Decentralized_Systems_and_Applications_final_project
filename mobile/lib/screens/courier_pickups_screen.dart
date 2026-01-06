@@ -79,8 +79,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   }
 
   Future<void> _acceptPickup(String pickupId) async {
-    _showProcessingDialog(
-        'İmza bekleniyor...', 'Lütfen cüzdanınızda imza onayı verin');
+    _showProcessingDialog('Waiting for signature...',
+        'Please approve the signature in your wallet');
 
     try {
       await _api.acceptPickup(pickupId);
@@ -89,7 +89,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
         Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Talep kabul edildi!'),
+            content: Text('Request accepted!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -101,7 +101,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
         Navigator.of(context).pop(); // Close dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString()}'),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -131,17 +131,17 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   }
 
   Future<void> _completePickup(String pickupId) async {
-    _showProcessingDialog(
-        'İmza bekleniyor...', 'Lütfen cüzdanınızda imza onayı verin');
+    _showProcessingDialog('Waiting for signature...',
+        'Please approve the signature in your wallet');
 
     try {
       await _api.completePickup(pickupId);
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close dialog
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Talep tamamlandı! 🎉'),
+            content: Text('Request completed! 🎉'),
             backgroundColor: Colors.green,
           ),
         );
@@ -153,7 +153,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${e.toString()}'),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -183,15 +183,15 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
   String _getMaterialName(String material) {
     switch (material.toLowerCase()) {
       case 'plastic':
-        return 'Plastik';
+        return 'Plastic';
       case 'glass':
-        return 'Cam';
+        return 'Glass';
       case 'paper':
-        return 'Kağıt';
+        return 'Paper';
       case 'metal':
         return 'Metal';
       case 'electronics':
-        return 'Elektronik';
+        return 'Electronics';
       default:
         return material;
     }
@@ -206,17 +206,17 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
       case 'pending':
         bgColor = Colors.orange.shade100;
         textColor = Colors.orange.shade700;
-        label = 'Bekliyor';
+        label = 'Pending';
         break;
       case 'assigned':
         bgColor = Colors.blue.shade100;
         textColor = Colors.blue.shade700;
-        label = 'Kabul Edildi';
+        label = 'Accepted';
         break;
       case 'completed':
         bgColor = Colors.green.shade100;
         textColor = Colors.green.shade700;
-        label = 'Tamamlandı';
+        label = 'Completed';
         break;
       default:
         bgColor = Colors.grey.shade100;
@@ -305,7 +305,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
                         Icon(Icons.home, size: 16, color: Colors.blue.shade700),
                         const SizedBox(width: 6),
                         Text(
-                          'Adres',
+                          'Address',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -368,7 +368,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
                 child: ElevatedButton.icon(
                   onPressed: () => _acceptPickup(pickup.id),
                   icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Kabul Et'),
+                  label: const Text('Accept'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700,
                     foregroundColor: Colors.white,
@@ -384,7 +384,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
                 child: ElevatedButton.icon(
                   onPressed: () => _completePickup(pickup.id),
                   icon: const Icon(Icons.done_all),
-                  label: const Text('Tamamla'),
+                  label: const Text('Complete'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     foregroundColor: Colors.white,
@@ -401,7 +401,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
                       color: Colors.green.shade700, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    'Tamamlandı',
+                    'Completed',
                     style: TextStyle(
                       color: Colors.green.shade700,
                       fontWeight: FontWeight.bold,
@@ -420,13 +420,13 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
     final diff = now.difference(date);
 
     if (diff.inMinutes < 1) {
-      return 'Şimdi';
+      return 'Just now';
     } else if (diff.inHours < 1) {
-      return '${diff.inMinutes} dk önce';
+      return '${diff.inMinutes} min ago';
     } else if (diff.inDays < 1) {
-      return '${diff.inHours} sa önce';
+      return '${diff.inHours} hr ago';
     } else if (diff.inDays < 7) {
-      return '${diff.inDays} gün önce';
+      return '${diff.inDays} days ago';
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
@@ -450,7 +450,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Hata',
+              'Error',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -470,7 +470,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             ElevatedButton.icon(
               onPressed: _loadPickups,
               icon: const Icon(Icons.refresh),
-              label: const Text('Tekrar Dene'),
+              label: const Text('Try Again'),
             ),
           ],
         ),
@@ -489,9 +489,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              isPending
-                  ? 'Bekleyen talep yok'
-                  : 'Henüz kabul ettiğiniz talep yok',
+              isPending ? 'No pending requests' : 'No accepted requests yet',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade600,
@@ -500,8 +498,8 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
             const SizedBox(height: 8),
             Text(
               isPending
-                  ? 'Yeni talepler geldiğinde burada görünecek'
-                  : 'Kabul ettiğiniz talepler burada görünecek',
+                  ? 'New requests will appear here'
+                  : 'Accepted requests will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
@@ -531,7 +529,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kurye Talepler'),
+        title: const Text('Courier Requests'),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
@@ -548,11 +546,11 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
           tabs: const [
             Tab(
               icon: Icon(Icons.pending_actions),
-              text: 'Bekleyen',
+              text: 'Pending',
             ),
             Tab(
               icon: Icon(Icons.assignment_turned_in),
-              text: 'Taleplerim',
+              text: 'My Requests',
             ),
           ],
         ),
@@ -584,7 +582,7 @@ class _CourierPickupsScreenState extends State<CourierPickupsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user?.name ?? 'Kurye',
+                        user?.name ?? 'Courier',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
