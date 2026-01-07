@@ -562,6 +562,13 @@ Admins can manage coupons (add, edit point costs, delete) via the admin panel.
 - Ensure you have enough Sepolia test ETH
 - Verify contract addresses are correct
 - Check gas limit settings
+---
+
+# System Architecture Diagram
+
+![System Architecture](https://github.com/furkanaknc/CENG_3550_Decentralized_Systems_and_Applications_final_project/blob/d1f43a5e9c502ce76c3987fd56f990ea274b1b4f/system_architecture_diagram.jpg?raw=true)
+
+---
 
 ---
 
