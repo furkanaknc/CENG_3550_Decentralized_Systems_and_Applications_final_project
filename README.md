@@ -114,6 +114,10 @@ backend/
 | POST   | `/api/admin/coupons`        | Create coupon        |
 | PATCH  | `/api/admin/coupons/:id`    | Update coupon        |
 | DELETE | `/api/admin/coupons/:id`    | Delete coupon        |
+| GET    | `/api/admin/locations`      | List recycling centers          |
+| POST   | `/api/admin/locations`      | Create recycling center         |
+| PATCH  | `/api/admin/locations/:id`  | Update center (name, materials) |
+| DELETE | `/api/admin/locations/:id`  | Delete recycling center         |
 
 ### Maps & Analytics
 
@@ -419,7 +423,7 @@ Couriers accept and complete pickup requests, earning on each delivery.
 
 Admins have full platform control with a comprehensive dashboard.
 
-**Available Screens (5 Tabs):**
+**Available Screens (6 Tabs):**
 
 | Tab           | Features                                                                                                                                                                                                                                   |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -428,6 +432,8 @@ Admins have full platform control with a comprehensive dashboard.
 | **Pickups**   | • View all pickup requests<br>• See status (pending/assigned/completed)<br>• See user name and material details                                                                                                                            |
 | **Rewards**   | • View material reward multipliers<br>• Edit multipliers (triggers blockchain transaction)<br>• See blockchain transaction confirmation<br>• Real-time multiplier updates on-chain                                                         |
 | **Coupons**   | • List all coupons (active/inactive)<br>• Edit coupon point costs<br>• Delete coupons<br>• See partner names and discount values                                                                                                           |
+| **Coupons**   | • List all coupons (active/inactive)<br>• Create new coupons with discount type, value, and point cost<br>• Edit coupon point costs<br>• Delete coupons<br>• See partner names and discount values                                         |
+| **Locations** | • List all recycling centers<br>• Create new centers with coordinates and accepted materials<br>• Edit center name and materials (location fixed)<br>• Delete recycling centers<br>• Material selection via filter chips  
 
 **Navigation Bar:** Admin → Map
 
