@@ -267,6 +267,7 @@ import {
   listAllLocations,
   upsertRecyclingLocation,
   deleteLocation,
+  findLocationById,
 } from "../repositories/recyclingLocationsRepository";
 import type { RecyclingLocation } from "../models";
 import { v4 as uuid } from "uuid";
@@ -326,6 +327,36 @@ export async function removeLocation(req: AuthenticatedRequest, res: Response) {
   } catch (error) {
     console.error("Failed to delete location:", error);
     res.status(500).json({ message: "Failed to delete location" });
+  }
+}
+
+export async function updateLocation(req: AuthenticatedRequest, res: Response) {
+  const { id } = req.params;
+  const { name, acceptedMaterials } = req.body;
+
+  try {
+    const existing = await findLocationById(id);
+
+    if (!existing) {
+      return res.status(404).json({ message: "Location not found" });
+    }
+
+    const updatedLocation: RecyclingLocation = {
+      id,
+      name: name ?? existing.name,
+      coordinates: existing.coordinates,
+      acceptedMaterials: acceptedMaterials ?? existing.acceptedMaterials,
+    };
+
+    await upsertRecyclingLocation(updatedLocation);
+
+    res.json({
+      message: "Location updated successfully",
+      location: updatedLocation,
+    });
+  } catch (error) {
+    console.error("Failed to update location:", error);
+    res.status(500).json({ message: "Failed to update location" });
   }
 }
 

@@ -13,6 +13,7 @@ import {
   syncUserRole,
   getLocations,
   createLocation,
+  updateLocation,
   removeLocation,
   getCoupons,
   addCoupon,
@@ -37,6 +38,7 @@ router.get("/couriers", getAllCouriers);
 
 router.get("/locations", getLocations);
 router.post("/locations", createLocation);
+router.patch("/locations/:id", updateLocation);
 router.delete("/locations/:id", removeLocation);
 
 router.get("/blockchain/stats", getBlockchainStatsEndpoint);
